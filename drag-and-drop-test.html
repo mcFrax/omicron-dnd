@@ -5,12 +5,15 @@
     <title>JS Test</title>
     <style>
         .drag-container {
+            position: relative;
             width: 400px;
             padding: 10px;
             margin: 40px;
             border: 1px solid black;
         }
         .item {
+            position: relative; /* for z-index to work */
+            z-index: 2; /* above placeholder */
             padding: 10px;
             margin: 8px;
             font-size: 2rem;
@@ -19,6 +22,9 @@
             text-align: center;
             user-select: none;
             cursor: pointer;
+        }
+        .item.drag-item {
+            z-index: 10000000;
         }
         .blue {
             background: cornflowerblue;
@@ -34,6 +40,18 @@
         }
         .green {
             background: lightgreen;
+        }
+        .drag-placeholder {
+            position: absolute;
+            left: 18px; /* padding + item's margin */
+            top: 0;
+            width: calc(100% - 38px);
+            height: 20px;
+            z-index: 1;
+            background: lightgray;
+            user-select: none;
+            pointer-events: none;
+            visibility: hidden;
         }
     </style>
 </head>
@@ -52,13 +70,17 @@
         <div class="item red">
             ITEM
         </div>
+        <div class="drag-placeholder"></div>
     </div>
     <script>
         let $ = (s) => document.querySelector(s);
         let $$ = (s) => Array.from(document.querySelectorAll(s));
 
+        const placeholderHeight = 20;
+
         let fromEl = null;
         let dragEl = null;
+        let placeholderEl = null;
         let xBase = 0;
         let yBase = 0;
         let xLast = 0;
@@ -80,6 +102,7 @@
                 return;
             }
             fromEl = event.currentTarget;
+            placeholderEl = fromEl.lastElementChild;
             // We don't need to remove it from other elements, as there will
             // be no mousedown event until we are done.
             fromEl.removeEventListener('mousedown', noDrag_container_MouseDown);
@@ -89,6 +112,10 @@
             xLast = xBase = event.clientX;
             yLast = yBase = event.clientY;
             xDelta = yDelta = 0;
+
+            dragEl.classList.add('drag-item');
+            placeholderEl.style.transform = `translateY(${dragEl.offsetTop}px)`;
+            placeholderEl.style.visibility = 'visible';
         }
         function drag_window_MouseMove(event) {
             event.stopPropagation();
@@ -112,12 +139,20 @@
             if (event.button !== 0) {
                 return;
             }
+
             dragEl.style.transform = null;
+            dragEl.classList.remove('drag-item');
+            placeholderEl.style.visibility = 'hidden';
+            placeholderEl.transform = null;
+
             fromEl.addEventListener('mousedown', noDrag_container_MouseDown);
             window.removeEventListener('mousemove', drag_window_MouseMove, true);
             window.removeEventListener('mouseup', drag_window_MouseUp, true);
+
             dragEl = null;
             fromEl = null;
+            placeholderEl = null;
+
             if (animFrameRequestId) {
                 cancelAnimationFrame(animFrameRequestId);
                 animFrameRequestId = 0;
@@ -148,7 +183,11 @@
             }
             // Returns null if the event is directly on the container,
             // or the element was filtered out for any reason.
-            return result;
+            if (result && result.classList.contains('item'))
+                return result;
+            else {
+                return null;
+            }
         }
 
         // Init.
