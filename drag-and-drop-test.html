@@ -4,11 +4,129 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <title>JS Test</title>
     <style>
+        .drag-container {
+            width: 400px;
+            padding: 10px;
+            margin: 40px;
+            border: 1px solid black;
+        }
+        .item {
+            padding: 10px;
+            font-size: 2rem;
+            font-weight: bold;
+            font-family: Arial, Helvetica, sans-serif;
+            text-align: center;
+            background: cornflowerblue;
+        }
     </style>
-    <script>
-    </script>
 </head>
 <body>
-    <h1>JS Test</h1>
+    <h1>Drag&drop test</h1>
+    <div class="drag-container">
+        <div class="item">
+            ITEM
+        </div>
+    </div>
+    <script>
+        let $ = (s) => document.querySelector(s);
+        let $$ = (s) => Array.from(document.querySelectorAll(s));
+
+        let fromEl = null;
+        let dragEl = null;
+        let xBase = 0;
+        let yBase = 0;
+        let xLast = 0;
+        let yLast = 0;
+        let xDelta = 0;
+        let yDelta = 0;
+        let animFrameRequestId = 0; // 0 is never used as actual id.
+
+        function initDragContainer(containerEl) {
+            containerEl.addEventListener('mousedown', noDrag_container_MouseDown);
+        }
+        function noDrag_container_MouseDown(event) {
+            // assert(dragEl === null);  // Not true if we add nested containers.
+            if (event.button !== 0) {
+                return;
+            }
+            dragEl = getItemFromContainerEvent(event);
+            if (!dragEl) {
+                return;
+            }
+            fromEl = event.currentTarget;
+            // We don't need to remove it from other elements, as there will
+            // be no mousedown event until we are done.
+            fromEl.removeEventListener('mousedown', noDrag_container_MouseDown);
+            window.addEventListener('mousemove', drag_window_MouseMove, true);
+            window.addEventListener('mouseup', drag_window_MouseUp, true);
+
+            xLast = xBase = event.clientX;
+            yLast = yBase = event.clientY;
+            xDelta = yDelta = 0;
+        }
+        function drag_window_MouseMove(event) {
+            event.stopPropagation();
+            event.preventDefault();
+
+            // assert((event.buttons & 1) === 1)
+
+            // Update the mouse position.
+            xLast = event.clientX;
+            yLast = event.clientY;
+            xDelta = xLast - xBase;
+            yDelta = yLast - yBase;
+
+            // Update the position of dragEl before the next frame.
+            if (!animFrameRequestId) {
+                animFrameRequestId = requestAnimationFrame(drag_animationFrame);
+            }
+        }
+
+        function drag_window_MouseUp(event) {
+            if (event.button !== 0) {
+                return;
+            }
+            dragEl.style.transform = null;
+            fromEl.addEventListener('mousedown', noDrag_container_MouseDown);
+            window.removeEventListener('mousemove', drag_window_MouseMove, true);
+            window.removeEventListener('mouseup', drag_window_MouseUp, true);
+            dragEl = null;
+            fromEl = null;
+            if (animFrameRequestId) {
+                cancelAnimationFrame(animFrameRequestId);
+                animFrameRequestId = 0;
+            }
+        }
+
+        function drag_animationFrame(timestamp) {
+            animFrameRequestId = 0;  // Allow scheduling for the next frame.
+            // TODO: adjust for scroll or other changes of the base.
+            dragEl.style.transform = `translate(${xDelta}px,${yDelta}px)`;
+            // Note: we will call the next frame if something happens. We will
+            // add the next requestAnimationFrame call here if we have
+            // an animation.
+        }
+
+
+        // Utils.
+
+        function getItemFromContainerEvent(event) {
+            // For now let's just find the element that is directly inside container.
+            // We can add a filter for handle on the way if we ever need, check for
+            // filter-in and -out classes, but eventually we just want this direct
+            // child.
+            let containerEl = event.currentTarget;
+            let result = null;
+            for (let el = event.target; el !== containerEl; el = el.parentElement) {
+                result = el;
+            }
+            // Returns null if the event is directly on the container,
+            // or the element was filtered out for any reason.
+            return result;
+        }
+
+        // Init.
+        initDragContainer($('.drag-container'));
+    </script>
 </body>
 </html>
