@@ -12,18 +12,44 @@
         }
         .item {
             padding: 10px;
+            margin: 8px;
             font-size: 2rem;
             font-weight: bold;
             font-family: Arial, Helvetica, sans-serif;
             text-align: center;
+            user-select: none;
+            cursor: pointer;
+        }
+        .blue {
             background: cornflowerblue;
+        }
+        .purple {
+            background: mediumpurple;
+        }
+        .pink {
+            background: deeppink;
+        }
+        .red {
+            background: tomato;
+        }
+        .green {
+            background: lightgreen;
         }
     </style>
 </head>
 <body>
     <h1>Drag&drop test</h1>
     <div class="drag-container">
-        <div class="item">
+        <div class="item blue">
+            ITEM
+        </div>
+        <div class="item purple">
+            ITEM
+        </div>
+        <div class="item pink">
+            ITEM
+        </div>
+        <div class="item red">
             ITEM
         </div>
     </div>
