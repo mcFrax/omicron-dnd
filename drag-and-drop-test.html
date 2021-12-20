@@ -1,15 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html lang="en-us">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <title>JS Test</title>
     <style>
+        .scroll-container {
+            width: 400px;
+            height: 80vh;
+            overflow: hidden scroll;
+            background: aliceblue;
+        }
         .drag-container {
             position: relative;
-            width: 400px;
+            width: 100%;
+            overflow: hidden;
             padding: 10px;
-            margin: 40px;
-            border: 1px solid black;
         }
         .item {
             position: relative; /* for z-index to work */
@@ -23,7 +28,14 @@
             user-select: none;
             cursor: pointer;
         }
-        .item.drag-item {
+        .item.drag-active-item {
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .item.drag-float-item {
+            position: fixed; /* This is required to escape from overflow rules. */
+            left: 0;
+            top: 0;
             z-index: 10000000;
         }
         .blue {
@@ -57,20 +69,22 @@
 </head>
 <body>
     <h1>Drag&drop test</h1>
-    <div class="drag-container">
-        <div class="item blue">
-            ITEM
+    <div class="scroll-container">
+        <div class="drag-container">
+            <div class="item blue">
+                ITEM
+            </div>
+            <div class="item purple">
+                ITEM
+            </div>
+            <div class="item pink">
+                ITEM
+            </div>
+            <div class="item red">
+                ITEM
+            </div>
+            <div class="drag-placeholder"></div>
         </div>
-        <div class="item purple">
-            ITEM
-        </div>
-        <div class="item pink">
-            ITEM
-        </div>
-        <div class="item red">
-            ITEM
-        </div>
-        <div class="drag-placeholder"></div>
     </div>
     <script>
         let $ = (s) => document.querySelector(s);
@@ -79,17 +93,22 @@
         const placeholderHeight = 20;
 
         let fromEl = null;
-        let dragEl = null;
+        let toEl = null;
+        let activeEl = null;
+        let floatEl = null;
         let placeholderEl = null;
-        let xBase = 0;
-        let yBase = 0;
+        let oldIndex = 0;
+        let newIndex = 0;
+        let xCursorOffset = 0;
+        let yCursorOffset = 0;
         let xLast = 0;
         let yLast = 0;
-        let xDelta = 0;
-        let yDelta = 0;
+        let xDragClientPos = 0;
+        let yDragClientPos = 0;
         let animFrameRequestId = 0; // 0 is never used as actual id.
 
-        let animGroups = [];
+        let anims = [];
+        let animsByElem = new Map();
 
         function initDragContainer(containerEl) {
             containerEl.addEventListener('mousedown', noDrag_container_MouseDown);
@@ -99,11 +118,11 @@
             if (event.button !== 0) {
                 return;
             }
-            dragEl = getItemFromContainerEvent(event);
-            if (!dragEl) {
+            activeEl = getItemFromContainerEvent(event);
+            if (!activeEl) {
                 return;
             }
-            fromEl = event.currentTarget;
+            toEl = fromEl = event.currentTarget;
             placeholderEl = fromEl.lastElementChild;
             // We don't need to remove it from other elements, as there will
             // be no mousedown event until we are done.
@@ -111,17 +130,35 @@
             window.addEventListener('mousemove', drag_window_MouseMove, true);
             window.addEventListener('mouseup', drag_window_MouseUp, true);
 
-            xLast = xBase = event.clientX;
-            yLast = yBase = event.clientY;
-            xDelta = yDelta = 0;
+            xLast = event.clientX;
+            yLast = event.clientY;
+            let activeElRect = activeEl.getClientRects()[0];
+            xCursorOffset = activeElRect.left - event.clientX;
+            yCursorOffset = activeElRect.top - event.clientY;
+            xDragClientPos = xLast + xCursorOffset;
+            yDragClientPos = yLast + yCursorOffset;
 
-            dragEl.classList.add('drag-item');
-            placeholderEl.style.transform = `translateY(${dragEl.offsetTop}px)`;
+            const currentItemWidth = getComputedStyle(activeEl).width;
+            const dragElHeight = activeEl.offsetHeight;
+
+            placeholderEl.style.transform = `translateY(${activeEl.offsetTop}px)`;
             placeholderEl.style.visibility = 'visible';
 
+            floatEl = activeEl.cloneNode(true);
+            floatEl.classList.add('drag-float-item');
+            floatEl.style.width = currentItemWidth;
+            floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px)`;
+            fromEl.appendChild(floatEl);
+
+            activeEl.classList.add('drag-active-item');
+
+            // Note: this is a string with px.
+
             let childrenArray = Array.from(fromEl.children);
-            let itemsAfter = childrenArray.slice(childrenArray.indexOf(dragEl) + 1, -1);
-            AnimGroup.start(fromEl, itemsAfter, placeholderEl.offsetHeight - dragEl.offsetHeight, 200);
+            newIndex = oldIndex = childrenArray.indexOf(activeEl);
+            // Skip 2 elements at the end: the placeholder and floatEl.
+            let itemsAfter = childrenArray.slice(oldIndex + 1, -2);
+            Anim.start(fromEl, itemsAfter, placeholderEl.offsetHeight - activeEl.offsetHeight, 100);
         }
         function drag_window_MouseMove(event) {
             event.stopPropagation();
@@ -132,8 +169,8 @@
             // Update the mouse position.
             xLast = event.clientX;
             yLast = event.clientY;
-            xDelta = xLast - xBase;
-            yDelta = yLast - yBase;
+            xDragClientPos = xLast + xCursorOffset;
+            yDragClientPos = yLast + yCursorOffset;
 
             // Update the position of dragEl before the next frame.
             if (!animFrameRequestId) {
@@ -146,8 +183,16 @@
                 return;
             }
 
-            dragEl.style.transform = null;
-            dragEl.classList.remove('drag-item');
+            floatEl.remove();
+
+            // Although there may be many elements moving, the only group that
+            // is not going into the right place yet are the elements after the
+            // inserted/reverted element.
+            let childrenArray = Array.from(fromEl.children);
+            let itemsAfter = childrenArray.slice(oldIndex + 1, -1);
+            Anim.start(fromEl, itemsAfter, 0, 100);
+
+            activeEl.classList.remove('drag-active-item');
             placeholderEl.style.visibility = 'hidden';
             placeholderEl.transform = null;
 
@@ -155,26 +200,30 @@
             window.removeEventListener('mousemove', drag_window_MouseMove, true);
             window.removeEventListener('mouseup', drag_window_MouseUp, true);
 
-            dragEl = null;
+            activeEl = null;
+            floatEl = null;
             fromEl = null;
+            toEl = null;
             placeholderEl = null;
-
-            // Move elements back.
+            oldIndex = newIndex = 0;
         }
 
         function animationFrame(timestamp) {
             animFrameRequestId = 0;  // Allow scheduling for the next frame.
-            if (dragEl) {
+            if (floatEl) {
                 // TODO: adjust for scroll or other changes of the base.
-                dragEl.style.transform = `translate(${xDelta}px,${yDelta}px)`;
+                floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px)`;
             }
             let needsNextFrame = false;
             // Iterate backwards to allow simple removal.
-            for (let i = animGroups.length - 1; i >= 0; --i) {
-                if (animGroups[i].animationFrame(timestamp)) {
+            for (let i = anims.length - 1; i >= 0; --i) {
+                if (anims[i].animationFrame(timestamp)) {
                     needsNextFrame = true;
                 } else {
-                    animGroups.splice(i, 1);
+                    for (let elem of anims[i].elems) {
+                        animsByElem.delete(elem);
+                    }
+                    anims.splice(i, 1);
                 }
             }
             if (needsNextFrame) {
@@ -185,29 +234,44 @@
 
         // Utils.
 
-        class AnimGroup {
+        class Anim {
             static start(parentEl, elems, targetYTranslation, durationMs, startYTranslation) {
-                // Assume all the elements have the same starting Y translation,
-                // and compute it.
-                let parentRect = parentEl.getClientRects()[0];
-                let elemRect = elems[0].getClientRects()[0];
                 // How the actual, visible position differs from offsetTop.
                 if (typeof startYTranslation === 'undefined') {
-                    startYTranslation = (elemRect.top - parentRect.top) - elems[0].offsetTop;
-                    if (startYTranslation === targetYTranslation) {
-                        return;
+                    // TODO: Group the elements with the same initial translation.
+                    // Round the initial translation to avoid sub-pixel differences.
+                    // Alternatively work it around so that we _know_ all elements
+                    // have the same starting transform - generating all these rects
+                    // is a lot of useless computation and allocation.
+                    let parentRect = parentEl.getClientRects()[0];
+                    for (let elem of elems) {
+                        let elemRect = elem.getClientRects()[0];
+                        startYTranslation = (elemRect.top - parentRect.top) - elem.offsetTop;
+                        if (startYTranslation !== targetYTranslation) {
+                            Anim.add(elem, new Anim(parentEl, [elem], startYTranslation, targetYTranslation, durationMs));
+                        }
                     }
                 } else {
                     // Immediately make sure that the elements are where they are supposed to start.
                     let transformString = `translateY(${startYTranslation}px)`;
-                    for (let elem of this.elems) {
+                    for (let elem of elems) {
                         elem.style.transform = transformString;
+                        Anim.add(elem, new Anim(parentEl, [elem], startYTranslation, targetYTranslation, durationMs));
                     }
                 }
-                animGroups.push(new AnimGroup(parentEl, elems, startYTranslation, targetYTranslation, durationMs));
                 if (!animFrameRequestId) {
                     animFrameRequestId = requestAnimationFrame(animationFrame);
                 }
+            }
+
+            /* private */ static add(elem, anim) {
+                // Replace any old anim for this elem.
+                let previousAnim = animsByElem.get(elem);
+                if (previousAnim) {
+                    anims.splice(anims.indexOf(previousAnim), 1);
+                }
+                anims.push(anim);
+                animsByElem.set(elem, anim);
             }
 
             /* private */ constructor(parentEl, elems, startYTranslation, targetYTranslation, durationMs) {
@@ -260,6 +324,13 @@
         }
 
         // Init.
+        for (let i = 0; i < 800; ++i) {
+            let el = document.createElement('div');
+            el.classList.add('item');
+            el.classList.add('green');
+            el.textContent = 'ITEM';
+            $('.drag-placeholder').before(el);
+        }
         initDragContainer($('.drag-container'));
     </script>
 </body>
