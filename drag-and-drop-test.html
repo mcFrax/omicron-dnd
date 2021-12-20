@@ -89,6 +89,8 @@
         let yDelta = 0;
         let animFrameRequestId = 0; // 0 is never used as actual id.
 
+        let animGroups = [];
+
         function initDragContainer(containerEl) {
             containerEl.addEventListener('mousedown', noDrag_container_MouseDown);
         }
@@ -116,6 +118,10 @@
             dragEl.classList.add('drag-item');
             placeholderEl.style.transform = `translateY(${dragEl.offsetTop}px)`;
             placeholderEl.style.visibility = 'visible';
+
+            let childrenArray = Array.from(fromEl.children);
+            let itemsAfter = childrenArray.slice(childrenArray.indexOf(dragEl) + 1, -1);
+            AnimGroup.start(fromEl, itemsAfter, placeholderEl.offsetHeight - dragEl.offsetHeight, 200);
         }
         function drag_window_MouseMove(event) {
             event.stopPropagation();
@@ -131,7 +137,7 @@
 
             // Update the position of dragEl before the next frame.
             if (!animFrameRequestId) {
-                animFrameRequestId = requestAnimationFrame(drag_animationFrame);
+                animFrameRequestId = requestAnimationFrame(animationFrame);
             }
         }
 
@@ -153,23 +159,78 @@
             fromEl = null;
             placeholderEl = null;
 
-            if (animFrameRequestId) {
-                cancelAnimationFrame(animFrameRequestId);
-                animFrameRequestId = 0;
-            }
+            // Move elements back.
         }
 
-        function drag_animationFrame(timestamp) {
+        function animationFrame(timestamp) {
             animFrameRequestId = 0;  // Allow scheduling for the next frame.
-            // TODO: adjust for scroll or other changes of the base.
-            dragEl.style.transform = `translate(${xDelta}px,${yDelta}px)`;
-            // Note: we will call the next frame if something happens. We will
-            // add the next requestAnimationFrame call here if we have
-            // an animation.
+            if (dragEl) {
+                // TODO: adjust for scroll or other changes of the base.
+                dragEl.style.transform = `translate(${xDelta}px,${yDelta}px)`;
+            }
+            let needsNextFrame = false;
+            // Iterate backwards to allow simple removal.
+            for (let i = animGroups.length - 1; i >= 0; --i) {
+                if (animGroups[i].animationFrame(timestamp)) {
+                    needsNextFrame = true;
+                } else {
+                    animGroups.splice(i, 1);
+                }
+            }
+            if (needsNextFrame) {
+                animFrameRequestId = requestAnimationFrame(animationFrame);
+            }
         }
 
 
         // Utils.
+
+        class AnimGroup {
+            static start(parentEl, elems, targetYTranslation, durationMs) {
+                // Assume all the elements have the same starting Y translation,
+                // and compute it.
+                let parentRect = parentEl.getClientRects()[0];
+                let elemRect = elems[0].getClientRects()[0];
+                // How the actual, visible position differs from offsetTop.
+                let startYTranslation = (elemRect.top - parentRect.top) - elems[0].offsetTop;
+                if (startYTranslation === targetYTranslation) {
+                    return;
+                }
+                animGroups.push(new AnimGroup(parentEl, elems, startYTranslation, targetYTranslation, durationMs));
+                if (!animFrameRequestId) {
+                    animFrameRequestId = requestAnimationFrame(animationFrame);
+                }
+            }
+
+            /* private */ constructor(parentEl, elems, startYTranslation, targetYTranslation, durationMs) {
+                // assert(elems.length);
+                this.parentEl = parentEl;
+                this.elems = elems;
+                this.startYTranslation = startYTranslation;
+                this.targetYTranslation = targetYTranslation;
+                this.durationMs = durationMs;
+                this.startTime = null;  // Will be filled in in the animation frame.
+                this.endTime = null;
+            }
+
+            // Will return true if the next frame should be requested.
+            animationFrame(timestamp) {
+                if (!this.startTime) {
+                    this.startTime = timestamp;
+                    this.endTime = timestamp + this.durationMs;
+                    return true;  // Do nothing
+                }
+                let advancementRate =
+                    timestamp >= this.endTime ? 1 : (timestamp - this.startTime) / this.durationMs;
+                let currentYTranslation =
+                    advancementRate * this.targetYTranslation + (1 - advancementRate) * this.startYTranslation;
+                let transformString = `translateY(${currentYTranslation}px)`;
+                for (let elem of this.elems) {
+                    elem.style.transform = transformString;
+                }
+                return (advancementRate < 1);
+            }
+        }
 
         function getItemFromContainerEvent(event) {
             // For now let's just find the element that is directly inside container.
