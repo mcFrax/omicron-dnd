@@ -69,6 +69,10 @@
 </head>
 <body>
     <h1>Drag&drop test</h1>
+    <div>
+        <input type="number" value="2" min="1", max="1000" id="greenNumber">
+        <button onclick="addGreenItemsButtonClick()">Add items</button>
+    </div>
     <div class="scroll-container">
         <div class="drag-container">
             <div class="item blue">
@@ -149,10 +153,10 @@
             xDragClientPos = xLast + xCursorOffset;
             yDragClientPos = yLast + yCursorOffset;
 
-            yStartNoMoveZone = activeElRect.top - 10;
+            yStartNoMoveZone = activeElRect.top - 8;
             // We need to compute the end from the top, and use placeholder's
             // height instead of the element's height.
-            yEndNoMoveZone = activeElRect.top + 30;
+            yEndNoMoveZone = activeElRect.top + 28;
 
             const currentItemWidth = getComputedStyle(activeEl).width;
             const dragElHeight = activeEl.offsetHeight;
@@ -211,8 +215,8 @@
 
             let wiggleZoneSize = 0.7;
             let snapMargin = (1 - wiggleZoneSize) / 2;
-            let bottomSnapPart = yDirection === -1 ? snapMargin : (1 - snapMargin);
-            let mouseY = event.clientY;
+            let bottomSnapBorder = yDirection === -1 ? snapMargin : (1 - snapMargin);
+            let mouseY = event.clientY - toEl.getClientRects()[0].top;
             let itemsInContainer = toEl.children.length - ((toEl === fromEl) ? 2 : 1);
             if (mouseY < yStartNoMoveZone && newIndex !== 0) {
                 // Correct for the fact that if we dragged the element down from
@@ -232,7 +236,7 @@
                     }
                     let otherTop = otherEl.offsetTop + offsetCorrection;
                     let otherHeight = otherEl.offsetHeight;
-                    if (mouseY > otherTop + bottomSnapPart * otherHeight) {
+                    if (mouseY > otherTop + bottomSnapBorder * otherHeight) {
                         // Insert activeEl after otherEl.
                         if (toEl === fromEl && i > oldIndex) {
                             // Special new case. otherEl will be moved up
@@ -260,7 +264,7 @@
                     }
                     let otherTop = otherEl.offsetTop + offsetCorrection;
                     let otherHeight = otherEl.offsetHeight;
-                    if (mouseY < otherTop + bottomSnapPart * otherHeight) {
+                    if (mouseY < otherTop + bottomSnapBorder * otherHeight) {
                         // Insert activeEl before otherEl.
                         if (toEl === fromEl && i > oldIndex) {
                             // Special new case. otherEl won't be bumped to i+1
@@ -279,12 +283,41 @@
                 let previousIndex = newIndex;
                 newIndex = updatedNewIndex;
                 animateMoveInsideContainer(toEl, previousIndex, updatedNewIndex);
+
+                let ref, offsetCorrection;
+                if (itemsInContainer === 0) {
+                    // We don't have any reference, it will just be at the top.
+                    // However, the offsetCorrection should probably account for
+                    // margin/padding.
+                    ref = null;
+                    offsetCorrection = 0;
+                } else if (toEl === fromEl && newIndex === itemsInContainer - 1) {
+                    // Last element in fromEl.
+                    ref = toEl.children[itemsInContainer-1];
+                    // Position the placeholder _after_ the ref.
+                    offsetCorrection = ref.offsetHeight + 8 + activeToNothingOffset;
+                } else if (toEl !== fromEl && newIndex === itemsInContainer) {
+                    // Last element, not in fromEl.
+                    ref = toEl.children[itemsInContainer-1];
+                    // Position the placeholder _after_ the ref.
+                    offsetCorrection = ref.offsetHeight + 8;
+                } else if (toEl === fromEl && newIndex > oldIndex) {
+                    ref = toEl.children[newIndex + 1]
+                    offsetCorrection = activeToNothingOffset;
+                } else {
+                    ref = toEl.children[newIndex]
+                    offsetCorrection = 0;
+                }
+                // This will be the new activeEl top, once we move it.
+                let newPlaceholderTop = ref ? ref.offsetTop + offsetCorrection : offsetCorrection;
+                yStartNoMoveZone = newPlaceholderTop - 8;
+                yEndNoMoveZone = newPlaceholderTop + 28;
+                placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
             }
         }
 
         function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
             console.log('moveInsideContainer', newNewIndex);
-
 
             // There are 4 groups of elements, adjusted by different offsets:
             //
@@ -321,15 +354,21 @@
             // even though it's not visible.
             // Previous index doesn't matter any more here, it was only
             // for determining the affected range.
-            for (let i = affectedStart; i < affectedEnd; ++i) {
+            for (let i = affectedStart; i <= affectedEnd; ++i) {
                 let otherEl = containerEl.children[i];
                 if (otherEl === activeEl) continue;
 
-                let aboveNew = i >= newNewIndex;
-                let aboveOld = inFromEl && i >= oldIndex;
+                let afterOld = inFromEl && i >= oldIndex;
+                let afterNew = afterOld ? i > newNewIndex : i >= newNewIndex;
 
-                if (aboveNew && aboveOld) {
+                if (afterNew && afterOld) {
                     Anim.start(containerEl, [otherEl], activeToPlaceholderOffset, animMs);
+                } else if (afterNew) {
+                    Anim.start(containerEl, [otherEl], nothingToPlaceholderOffset, animMs);
+                } else if (afterOld) {
+                    Anim.start(containerEl, [otherEl], activeToNothingOffset, animMs);
+                } else {
+                    Anim.start(containerEl, [otherEl], 0, animMs);
                 }
             }
         }
@@ -344,9 +383,8 @@
             // Although there may be many elements moving, the only group that
             // is not going into the right place yet are the elements after the
             // inserted/reverted element.
-            let childrenArray = Array.from(fromEl.children);
-            let itemsAfter = childrenArray.slice(oldIndex + 1, -1);
-            Anim.start(fromEl, itemsAfter, 0, animMs);
+            let itemsArray = Array.from(fromEl.children).slice(0, -1);
+            Anim.start(fromEl, itemsArray, 0, animMs);
 
             activeEl.classList.remove('drag-active-item');
             placeholderEl.style.visibility = 'hidden';
@@ -402,6 +440,9 @@
             }
         }
 
+        function addGreenItemsButtonClick() {
+            addGreenItems(parseInt($('#greenNumber').value));
+        }
 
         // Utils.
 
@@ -494,14 +535,22 @@
             }
         }
 
-        // Init.
-        for (let i = 0; i < 800; ++i) {
+        function addGreenItem() {
             let el = document.createElement('div');
             el.classList.add('item');
             el.classList.add('green');
             el.textContent = 'ITEM';
             $('.drag-placeholder').before(el);
         }
+
+        function addGreenItems(count) {
+            for (let i = 0; i < count; ++i) {
+                addGreenItem();
+            }
+        }
+
+        // Init.
+        addGreenItems(4);
         initDragContainer($('.drag-container'));
     </script>
 </body>
