@@ -186,15 +186,23 @@
         // Utils.
 
         class AnimGroup {
-            static start(parentEl, elems, targetYTranslation, durationMs) {
+            static start(parentEl, elems, targetYTranslation, durationMs, startYTranslation) {
                 // Assume all the elements have the same starting Y translation,
                 // and compute it.
                 let parentRect = parentEl.getClientRects()[0];
                 let elemRect = elems[0].getClientRects()[0];
                 // How the actual, visible position differs from offsetTop.
-                let startYTranslation = (elemRect.top - parentRect.top) - elems[0].offsetTop;
-                if (startYTranslation === targetYTranslation) {
-                    return;
+                if (typeof startYTranslation === 'undefined') {
+                    startYTranslation = (elemRect.top - parentRect.top) - elems[0].offsetTop;
+                    if (startYTranslation === targetYTranslation) {
+                        return;
+                    }
+                } else {
+                    // Immediately make sure that the elements are where they are supposed to start.
+                    let transformString = `translateY(${startYTranslation}px)`;
+                    for (let elem of this.elems) {
+                        elem.style.transform = transformString;
+                    }
                 }
                 animGroups.push(new AnimGroup(parentEl, elems, startYTranslation, targetYTranslation, durationMs));
                 if (!animFrameRequestId) {
