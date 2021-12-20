@@ -184,8 +184,8 @@
             // assert((event.buttons & 1) === 1)
 
             // Update the mouse position.
-            if (event.offsetY !== 0) {
-                yDirection = event.offsetY > 0 ? 1 : -1;
+            if (event.movementY !== 0) {
+                yDirection = event.movementY > 0 ? 1 : -1;
             }
             xLast = event.clientX;
             yLast = event.clientY;
@@ -197,6 +197,8 @@
                 animFrameRequestId = requestAnimationFrame(animationFrame);
             }
 
+            let updatedNewIndex = newIndex;
+
             let wiggleZoneSize = 0.7;
             let snapMargin = (1 - wiggleZoneSize) / 2;
             let bottomSnapPart = yDirection === -1 ? snapMargin : (1 - snapMargin);
@@ -207,9 +209,7 @@
                 // its place, some elements above it are shifted from their
                 // offset position.
                 let offsetCorrection = toEl === fromEl ? activeToNothingOffset : 0;
-                // Uh, actually it's not that simple. If toEl === fromEl && newIndex > oldIndex,
-                // we get shenanigans here too.
-                let newNewIndex = 0;
+                updatedNewIndex = 0;
                 // We may look up one extra element at the start, but that is not an issue.
                 let iterationStart = Math.min(newIndex, itemsInContainer - 1);
                 for (let i = iterationStart; i >= 0; --i) {
@@ -223,17 +223,22 @@
                     let otherTop = otherEl.offsetTop + offsetCorrection;
                     let otherHeight = otherEl.offsetHeight;
                     if (mouseY > otherTop + bottomSnapPart * otherHeight) {
-                        newNewIndex = i + 1;
+                        // Insert activeEl after otherEl.
+                        if (toEl === fromEl && i > oldIndex) {
+                            // Special new case. otherEl will be moved up
+                            // and end up with index i-1, so inserting after
+                            // it means we will end up with index i.
+                            updatedNewIndex = i;
+                        } else {
+                            updatedNewIndex = i + 1;
+                        }
                         break;
                     }
-                }
-                if (newNewIndex != newIndex) {
-                    moveInsideContainer(newNewIndex);
                 }
             }
             if (mouseY > yEndNoMoveZone) {
                 let offsetCorrection = nothingToPlaceholderOffset;
-                let newNewIndex = itemsInContainer;
+                updatedNewIndex = itemsInContainer;
                 // We may look up one extra element at the start, but that is not an issue.
                 for (let i = newIndex; i < itemsInContainer; ++i) {
                     let otherEl = toEl.children[i];
@@ -244,18 +249,27 @@
                     let otherTop = otherEl.offsetTop + offsetCorrection;
                     let otherHeight = otherEl.offsetHeight;
                     if (mouseY < otherTop + bottomSnapPart * otherHeight) {
-                        newNewIndex = i;
+                        // Insert activeEl before otherEl.
+                        if (toEl === fromEl && i > oldIndex) {
+                            // Special new case. otherEl won't be bumped to i+1
+                            // but instead back to i-th position when we
+                            // re-insert activeEl, so the inserting splice
+                            // will be at position i-1, not i.
+                            updatedNewIndex = i - 1;
+                        } else {
+                            updatedNewIndex = i;
+                        }
                         break;
                     }
                 }
-                if (newNewIndex != newIndex) {
-                    moveInsideContainer(newNewIndex);
-                }
+            }
+            if (updatedNewIndex != newIndex) {
+                moveInsideContainer(updatedNewIndex);
             }
         }
 
-        function moveInsideContainer(newNewIndex) {
-            console.log('moveInsideContainer', newNewIndex);
+        function moveInsideContainer(updatedNewIndex) {
+            console.log('moveInsideContainer', updatedNewIndex);
         }
 
         function drag_window_MouseUp(event) {
