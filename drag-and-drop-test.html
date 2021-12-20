@@ -94,7 +94,6 @@
         let $ = (s) => document.querySelector(s);
         let $$ = (s) => Array.from(document.querySelectorAll(s));
 
-        const placeholderHeight = 20;
         const animMs = 100;
 
         let fromEl = null;
@@ -153,11 +152,6 @@
             xDragClientPos = xLast + xCursorOffset;
             yDragClientPos = yLast + yCursorOffset;
 
-            yStartNoMoveZone = activeEl.offsetTop - 8;
-            // We need to compute the end from the top, and use placeholder's
-            // height instead of the element's height.
-            yEndNoMoveZone = activeEl.offsetTop + 28;
-
             const currentItemWidth = getComputedStyle(activeEl).width;
             const dragElHeight = activeEl.offsetHeight;
 
@@ -176,6 +170,11 @@
 
 
             activeEl.classList.add('drag-active-item');
+
+            yStartNoMoveZone = activeEl.offsetTop - 8;
+            // We need to compute the end from the top, and use placeholder's
+            // height instead of the element's height.
+            yEndNoMoveZone = activeEl.offsetTop - nothingToPlaceholderOffset;
 
             // Note: this is a string with px.
 
@@ -311,7 +310,7 @@
                 // This will be the new activeEl top, once we move it.
                 let newPlaceholderTop = ref ? ref.offsetTop + offsetCorrection : offsetCorrection;
                 yStartNoMoveZone = newPlaceholderTop - 8;
-                yEndNoMoveZone = newPlaceholderTop + 28;
+                yEndNoMoveZone = newPlaceholderTop - nothingToPlaceholderOffset;
                 placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
             }
         }
