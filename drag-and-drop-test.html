@@ -376,8 +376,22 @@
             if (event.button !== 0) {
                 return;
             }
+            exitDrag(true);
+        }
 
-            floatEl.remove();
+        function exitDrag(execSort) {
+            floatEl.remove();  // Removing this element now saves some special casing.
+
+            if (execSort && (newIndex !== oldIndex || toEl !== fromEl)) {
+                activeEl.remove();
+                // Thanks to the placeholder, we don't need to special case
+                // inserting at the last place, as it is always before the
+                // placeholder.
+                toEl.children[newIndex].before(activeEl);
+
+                // TODO: adjust the current transforms and actually pass them
+                // to anim to enforce the correct animation start.
+            }
 
             // Although there may be many elements moving, the only group that
             // is not going into the right place yet are the elements after the
