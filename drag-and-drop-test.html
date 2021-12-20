@@ -99,19 +99,26 @@
         let placeholderEl = null;
         let oldIndex = 0;
         let newIndex = 0;
+        let activeToPlaceholderOffset = 0;
+        let activeToNothingOffset = 0;
+        let nothingToPlaceholderOffset = 0;
         let xCursorOffset = 0;
         let yCursorOffset = 0;
         let xLast = 0;
         let yLast = 0;
         let xDragClientPos = 0;
         let yDragClientPos = 0;
+        let yStartNoMoveZone = 0; // When cursor is between yStartNoMoveZone
+        let yEndNoMoveZone = 0;   // and yEndNoMoveZone nothing will happen.
         let animFrameRequestId = 0; // 0 is never used as actual id.
+        let yDirection = -1;
 
         let anims = [];
         let animsByElem = new Map();
 
         function initDragContainer(containerEl) {
             containerEl.addEventListener('mousedown', noDrag_container_MouseDown);
+            containerEl.addEventListener('mouseenter', anyState_container_MouseEnter);
         }
         function noDrag_container_MouseDown(event) {
             // assert(dragEl === null);  // Not true if we add nested containers.
@@ -138,8 +145,17 @@
             xDragClientPos = xLast + xCursorOffset;
             yDragClientPos = yLast + yCursorOffset;
 
+            yStartNoMoveZone = activeElRect.top - 10;
+            // We need to compute the end from the top, and use placeholder's
+            // height instead of the element's height.
+            yEndNoMoveZone = activeElRect.top + 30;
+
             const currentItemWidth = getComputedStyle(activeEl).width;
             const dragElHeight = activeEl.offsetHeight;
+
+            activeToPlaceholderOffset = placeholderEl.offsetHeight - dragElHeight;
+            activeToNothingOffset = -dragElHeight - 8;
+            nothingToPlaceholderOffset = placeholderEl.offsetHeight + 8;
 
             placeholderEl.style.transform = `translateY(${activeEl.offsetTop}px)`;
             placeholderEl.style.visibility = 'visible';
@@ -149,6 +165,7 @@
             floatEl.style.width = currentItemWidth;
             floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px)`;
             fromEl.appendChild(floatEl);
+
 
             activeEl.classList.add('drag-active-item');
 
@@ -167,6 +184,9 @@
             // assert((event.buttons & 1) === 1)
 
             // Update the mouse position.
+            if (event.offsetY !== 0) {
+                yDirection = event.offsetY > 0 ? 1 : -1;
+            }
             xLast = event.clientX;
             yLast = event.clientY;
             xDragClientPos = xLast + xCursorOffset;
@@ -176,6 +196,66 @@
             if (!animFrameRequestId) {
                 animFrameRequestId = requestAnimationFrame(animationFrame);
             }
+
+            let wiggleZoneSize = 0.7;
+            let snapMargin = (1 - wiggleZoneSize) / 2;
+            let bottomSnapPart = yDirection === -1 ? snapMargin : (1 - snapMargin);
+            let mouseY = event.clientY;
+            let itemsInContainer = toEl.children.length - ((toEl === fromEl) ? 2 : 1);
+            if (mouseY < yStartNoMoveZone && newIndex !== 0) {
+                // Correct for the fact that if we dragged the element down from
+                // its place, some elements above it are shifted from their
+                // offset position.
+                let offsetCorrection = toEl === fromEl ? activeToNothingOffset : 0;
+                // Uh, actually it's not that simple. If toEl === fromEl && newIndex > oldIndex,
+                // we get shenanigans here too.
+                let newNewIndex = 0;
+                // We may look up one extra element at the start, but that is not an issue.
+                let iterationStart = Math.min(newIndex, itemsInContainer - 1);
+                for (let i = iterationStart; i >= 0; --i) {
+                    let otherEl = toEl.children[i];
+                    if (otherEl === activeEl) continue;
+                    if (i < oldIndex) {
+                        // We could check for (toEl === fromEl) here, but the
+                        // value is going to be 0 anyway.
+                        offsetCorrection = 0;
+                    }
+                    let otherTop = otherEl.offsetTop + offsetCorrection;
+                    let otherHeight = otherEl.offsetHeight;
+                    if (mouseY > otherTop + bottomSnapPart * otherHeight) {
+                        newNewIndex = i + 1;
+                        break;
+                    }
+                }
+                if (newNewIndex != newIndex) {
+                    moveInsideContainer(newNewIndex);
+                }
+            }
+            if (mouseY > yEndNoMoveZone) {
+                let offsetCorrection = nothingToPlaceholderOffset;
+                let newNewIndex = itemsInContainer;
+                // We may look up one extra element at the start, but that is not an issue.
+                for (let i = newIndex; i < itemsInContainer; ++i) {
+                    let otherEl = toEl.children[i];
+                    if (otherEl === activeEl) continue;  // May still happen.
+                    if (i > oldIndex && toEl === fromEl) {
+                        offsetCorrection = activeToPlaceholderOffset;
+                    }
+                    let otherTop = otherEl.offsetTop + offsetCorrection;
+                    let otherHeight = otherEl.offsetHeight;
+                    if (mouseY < otherTop + bottomSnapPart * otherHeight) {
+                        newNewIndex = i;
+                        break;
+                    }
+                }
+                if (newNewIndex != newIndex) {
+                    moveInsideContainer(newNewIndex);
+                }
+            }
+        }
+
+        function moveInsideContainer(newNewIndex) {
+            console.log('moveInsideContainer', newNewIndex);
         }
 
         function drag_window_MouseUp(event) {
@@ -206,6 +286,21 @@
             toEl = null;
             placeholderEl = null;
             oldIndex = newIndex = 0;
+            yDirection = -1;
+        }
+
+        function anyState_container_MouseEnter(event) {
+            if (!fromEl) {
+                // Not dragging anything, so nothing to do.
+                return;
+            }
+            if (event.currentTarget === toEl) {
+                // Already in this container, nothing to do.
+                return;
+            }
+            // TODO: cleanup in toEl.
+            toEl = event.currentTarget;
+            // TODO: set the placeholder and animate the elements below it.
         }
 
         function animationFrame(timestamp) {
