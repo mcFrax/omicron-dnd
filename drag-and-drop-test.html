@@ -385,6 +385,11 @@
             let itemsArray = Array.from(fromEl.children).slice(0, -1);
             Anim.start(fromEl, itemsArray, 0, animMs);
 
+            // Our Anim handles only y animation for now, we should fix that.
+            // However, let's at least handle the y.
+            let activeElRect = activeEl.getClientRects()[0];
+            Anim.start(activeEl, [activeEl], 0, animMs, yDragClientPos - activeElRect.top);
+
             activeEl.classList.remove('drag-active-item');
             placeholderEl.style.visibility = 'hidden';
             placeholderEl.transform = null;
