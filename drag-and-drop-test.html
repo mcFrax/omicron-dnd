@@ -33,10 +33,11 @@
             pointer-events: none;
         }
         .item.drag-float-item {
-            position: fixed; /* This is required to escape from overflow rules. */
-            left: 0;
-            top: 0;
-            z-index: 10000000;
+            position: fixed !important; /* This is required to escape from overflow rules. */
+            left: 0 !important;
+            top: 0 !important;
+            margin: 0 !important;
+            z-index: 10000000 !important;
         }
         .blue {
             background: cornflowerblue;
