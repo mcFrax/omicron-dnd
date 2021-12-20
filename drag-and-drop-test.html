@@ -91,12 +91,16 @@
         let $$ = (s) => Array.from(document.querySelectorAll(s));
 
         const placeholderHeight = 20;
+        const animMs = 100;
 
         let fromEl = null;
         let toEl = null;
         let activeEl = null;
         let floatEl = null;
         let placeholderEl = null;
+        // TODO: current semantic is actually spliceIndex+insertIndex. It would
+        // be likely better to change it to actually oldIndex and newIndex.
+        // Or at least rename them to reflect the actual semantic.
         let oldIndex = 0;
         let newIndex = 0;
         let activeToPlaceholderOffset = 0;
@@ -175,7 +179,7 @@
             newIndex = oldIndex = childrenArray.indexOf(activeEl);
             // Skip 2 elements at the end: the placeholder and floatEl.
             let itemsAfter = childrenArray.slice(oldIndex + 1, -2);
-            Anim.start(fromEl, itemsAfter, placeholderEl.offsetHeight - activeEl.offsetHeight, 100);
+            Anim.start(fromEl, itemsAfter, activeToPlaceholderOffset, animMs);
         }
         function drag_window_MouseMove(event) {
             event.stopPropagation();
@@ -196,6 +200,12 @@
             if (!animFrameRequestId) {
                 animFrameRequestId = requestAnimationFrame(animationFrame);
             }
+
+            // TODO: extract the logic below to the common handling for mousemove and mouseenter.
+            // This will include replacing newIndex with a "baseIndex" or something,
+            // and the yStartNoMoveZone/yEndNoMoveZone must be updated accordingly.
+            // Perhaps the toEl should be replaced with a newToEl as argument
+            // to avoid a brittle global variable dependency.
 
             let updatedNewIndex = newIndex;
 
@@ -238,7 +248,9 @@
             }
             if (mouseY > yEndNoMoveZone) {
                 let offsetCorrection = nothingToPlaceholderOffset;
-                updatedNewIndex = itemsInContainer;
+                // Set to the highest possible value - in case we are at the very
+                // bottom of the container.
+                updatedNewIndex = (toEl === fromEl) ? itemsInContainer - 1 : itemsInContainer;
                 // We may look up one extra element at the start, but that is not an issue.
                 for (let i = newIndex; i < itemsInContainer; ++i) {
                     let otherEl = toEl.children[i];
@@ -264,12 +276,62 @@
                 }
             }
             if (updatedNewIndex != newIndex) {
-                moveInsideContainer(updatedNewIndex);
+                let previousIndex = newIndex;
+                newIndex = updatedNewIndex;
+                animateMoveInsideContainer(toEl, previousIndex, updatedNewIndex);
             }
         }
 
-        function moveInsideContainer(updatedNewIndex) {
-            console.log('moveInsideContainer', updatedNewIndex);
+        function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
+            console.log('moveInsideContainer', newNewIndex);
+
+
+            // There are 4 groups of elements, adjusted by different offsets:
+            //
+            // 1. no offset
+            // All elements before oldIndex (in fromEl) or newIndex
+            // (in containerEl).
+            // When fromEl === containerEl, both conditions are required.
+            //
+            // 2. activeToPlaceholderOffset
+            // Elements in fromEl with index after max(newIndex, oldIndex).
+            //
+            // 3. activeToNothingOffset
+            // Elements in fromEl that are after oldIndex, except those
+            // after newIndex when fromEl === containerEl.
+            //
+            // 4. nothingToPlaceholderOffset
+            // All elements after newIndex except those in fromEl that are also
+            // after oldIndex.
+            //
+            // I though that I'd do something smart to change the elements
+            // that are affected in groups, but no I'm thinking I'll go over
+            // all potentially effected elements and run the above logic for
+            // each of them.
+
+            // shadow newIndex to avoid using it accidentally
+            let newIndex = 'DEATH AND DESTRUCTION!';
+
+            let inFromEl = (fromEl === containerEl);
+            let affectedStart = Math.min(newNewIndex, previousIndex);
+            let affectedEnd = Math.max(newNewIndex, previousIndex);
+
+            // Note: we are using actual oldIndex below, not previousIndex.
+            // This is because we have to deal with activeEl affecting offsets,
+            // even though it's not visible.
+            // Previous index doesn't matter any more here, it was only
+            // for determining the affected range.
+            for (let i = affectedStart; i < affectedEnd; ++i) {
+                let otherEl = containerEl.children[i];
+                if (otherEl === activeEl) continue;
+
+                let aboveNew = i >= newNewIndex;
+                let aboveOld = inFromEl && i >= oldIndex;
+
+                if (aboveNew && aboveOld) {
+                    Anim.start(containerEl, [otherEl], activeToPlaceholderOffset, animMs);
+                }
+            }
         }
 
         function drag_window_MouseUp(event) {
@@ -284,7 +346,7 @@
             // inserted/reverted element.
             let childrenArray = Array.from(fromEl.children);
             let itemsAfter = childrenArray.slice(oldIndex + 1, -1);
-            Anim.start(fromEl, itemsAfter, 0, 100);
+            Anim.start(fromEl, itemsAfter, 0, animMs);
 
             activeEl.classList.remove('drag-active-item');
             placeholderEl.style.visibility = 'hidden';
