@@ -122,6 +122,8 @@
 
         let anims = [];
         let animsByElem = new Map();
+        // elem => [x, y]; no [0, 0] stored.
+        let transformsByElem = new Map();
 
         function initDragContainer(containerEl) {
             containerEl.addEventListener('mousedown', noDrag_container_MouseDown);
@@ -391,6 +393,8 @@
 
                 // TODO: adjust the current transforms and actually pass them
                 // to anim to enforce the correct animation start.
+
+                //(transformsByElem.get(elem) || [0, 0])[1]
             }
 
             // Although there may be many elements moving, the only group that
@@ -473,10 +477,8 @@
                     // Alternatively work it around so that we _know_ all elements
                     // have the same starting transform - generating all these rects
                     // is a lot of useless computation and allocation.
-                    let parentRect = parentEl.getClientRects()[0];
                     for (let elem of elems) {
-                        let elemRect = elem.getClientRects()[0];
-                        startYTranslation = (elemRect.top - parentRect.top) - elem.offsetTop;
+                        startYTranslation = (transformsByElem.get(elem) || [0, 0])[1];
                         if (startYTranslation !== targetYTranslation) {
                             Anim.add(elem, new Anim(parentEl, [elem], startYTranslation, targetYTranslation, durationMs));
                         }
@@ -528,6 +530,11 @@
                     advancementRate * this.targetYTranslation + (1 - advancementRate) * this.startYTranslation;
                 let transformString = `translateY(${currentYTranslation}px)`;
                 for (let elem of this.elems) {
+                    if (currentYTranslation === 0) {
+                        transformsByElem.delete(elem);
+                    } else {
+                        transformsByElem.set(elem, [0, currentYTranslation]);
+                    }
                     elem.style.transform = transformString;
                 }
                 return (advancementRate < 1);
