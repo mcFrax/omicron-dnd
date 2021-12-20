@@ -153,10 +153,10 @@
             xDragClientPos = xLast + xCursorOffset;
             yDragClientPos = yLast + yCursorOffset;
 
-            yStartNoMoveZone = activeElRect.top - 8;
+            yStartNoMoveZone = activeEl.offsetTop - 8;
             // We need to compute the end from the top, and use placeholder's
             // height instead of the element's height.
-            yEndNoMoveZone = activeElRect.top + 28;
+            yEndNoMoveZone = activeEl.offsetTop + 28;
 
             const currentItemWidth = getComputedStyle(activeEl).width;
             const dragElHeight = activeEl.offsetHeight;
