@@ -214,7 +214,7 @@
 
             let wiggleZoneSize = 0.7;
             let snapMargin = (1 - wiggleZoneSize) / 2;
-            let bottomSnapBorder = yDirection === -1 ? snapMargin : (1 - snapMargin);
+            let bottomSnapBorder = yDirection === -1 ? (1 - snapMargin) : snapMargin;
             let mouseY = event.clientY - toEl.getClientRects()[0].top;
             let itemsInContainer = toEl.children.length - ((toEl === fromEl) ? 2 : 1);
             if (mouseY < yStartNoMoveZone && newIndex !== 0) {
