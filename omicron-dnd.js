@@ -42,9 +42,7 @@
   }
   function setEvents_noDrag_to_drag() {
       // TODO: check for touchId and either set only touch or only mouse
-      // events. No need to have both. (but remove both anyway)
-      fromEl.removeEventListener('mousedown', noDrag_container_MouseDown);
-      fromEl.removeEventListener('touchstart', noDrag_container_MouseDown);
+      // events. No need to have both.
       window.addEventListener('mousemove', drag_window_MouseMove, true);
       window.addEventListener('touchmove', drag_window_MouseMove, true);
       window.addEventListener('mouseup', drag_window_MouseUp, true);
@@ -52,8 +50,6 @@
       window.addEventListener('touchcancel', drag_window_MouseUp, true);
   }
   function setEvents_drag_to_noDrag() {
-      fromEl.addEventListener('mousedown', noDrag_container_MouseDown);
-      fromEl.addEventListener('touchstart', noDrag_container_MouseDown);
       window.removeEventListener('mousemove', drag_window_MouseMove, true);
       window.removeEventListener('touchmove', drag_window_MouseMove, true);
       window.removeEventListener('mouseup', drag_window_MouseUp, true);
@@ -162,19 +158,14 @@
           animFrameRequestId = requestAnimationFrame(animationFrame);
       }
 
-      let mouseY = evPlace.clientY - toEl.getClientRects()[0].top;
-
-      let updatedNewIndex = findUpdatedNewIndex(mouseY);
+      let updatedNewIndex = findUpdatedNewIndex(evPlace);
 
       if (updatedNewIndex != newIndex) {
           let previousIndex = newIndex;
           newIndex = updatedNewIndex;
           animateMoveInsideContainer(toEl, previousIndex, updatedNewIndex);
 
-          let newPlaceholderTop = findPlaceholderTop();
-          yStartNoMoveZone = newPlaceholderTop - 8;
-          yEndNoMoveZone = newPlaceholderTop - nothingToPlaceholderOffset;
-          placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
+          setPlaceholderAndNoMoveZone();
       }
   }
 
@@ -183,13 +174,15 @@
   // precomputed zone where we know no move happened. When ignoreCurrentNewIndex
   // is true, we ignore both optimization, which is useful for computing
   // the index in a new container.
-  function findUpdatedNewIndex(mouseY, ignoreCurrentNewIndex) {
+  function findUpdatedNewIndex(mouseEventvOrTouch, ignoreCurrentNewIndex) {
+    let mouseY = mouseEventvOrTouch.clientY - toEl.getClientRects()[0].top;
+
     let updatedNewIndex = newIndex;
 
     let wiggleZoneSize = 0.5;
     let snapMargin = (1 - wiggleZoneSize) / 2;
     let bottomSnapBorder = yDirection === -1 ? (1 - snapMargin) : snapMargin;
-    let itemsInContainer = toEl.children.length - ((toEl === fromEl) ? 2 : 1);
+    let itemsInContainer = getItemsInContainer(toEl);
     if (ignoreCurrentNewIndex || mouseY < yStartNoMoveZone && newIndex !== 0) {
         // Correct for the fact that if we dragged the element down from
         // its place, some elements above it are shifted from their
@@ -256,7 +249,15 @@
     return updatedNewIndex;
   }
 
+  function setPlaceholderAndNoMoveZone() {
+    let newPlaceholderTop = findPlaceholderTop();
+    yStartNoMoveZone = newPlaceholderTop - 8;
+    yEndNoMoveZone = newPlaceholderTop - nothingToPlaceholderOffset;
+    placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
+  }
+
   function findPlaceholderTop() {
+    let itemsInContainer = getItemsInContainer(toEl);
     let ref, offsetCorrection;
     if (itemsInContainer === 0) {
         // We don't have any reference, it will just be at the top.
@@ -350,6 +351,7 @@
       if (!touchEvent && event.button !== 0) {
           return;
       }
+      // TODO: handle touchcancel
       exitDrag(true);
   }
 
@@ -429,9 +431,23 @@
           // Already in this container, nothing to do.
           return;
       }
-      // TODO: cleanup in toEl.
+
+      // Handle removal from the previous container.
+      placeholderEl.style.visibility = 'hidden';
+      placeholderEl.style.transform = null;
+
+      animateMoveInsideContainer(toEl, newIndex, getItemsInContainer(toEl));
+
+      // Then handle insertion into the new container.
       toEl = event.currentTarget;
-      // TODO: set the placeholder and animate the elements below it.
+
+      newIndex = findUpdatedNewIndex(event, /*ignoreCurrentNewIndex=*/true);
+      animateMoveInsideContainer(toEl, getItemsInContainer(toEl), newIndex);
+
+      placeholderEl =
+        toEl !== fromEl ? toEl.lastElementChild : floatEl.previousElementSibling;
+      setPlaceholderAndNoMoveZone();
+      placeholderEl.style.visibility = 'visible';
   }
 
   function animationFrame(timestamp) {
@@ -458,6 +474,10 @@
   }
 
   // Utils.
+
+  function getItemsInContainer(containerEl) {
+    return containerEl.children.length - ((containerEl === fromEl) ? 2 : 1);
+  }
 
   // Returns null if the touch is not in event.changedTouches.
   function getChangedTouchById(event, touchId) {

@@ -25,7 +25,7 @@
         .drag-container {
             position: relative;
             width: 100%;
-            overflow: hidden;
+            overflow: visible; /* for the placeholder to be visible when hanging from the bottom */
             padding: 10px;
         }
         .item {
@@ -50,6 +50,7 @@
             top: 0 !important;
             margin: 0 !important;
             z-index: 10000000 !important;
+            pointer-events: none !important;
         }
         .blue {
             background: cornflowerblue;
