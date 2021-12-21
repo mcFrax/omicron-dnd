@@ -150,8 +150,10 @@
             xLast = event.clientX;
             yLast = event.clientY;
             let activeElRect = activeEl.getClientRects()[0];
-            xCursorOffset = activeElRect.left - event.clientX;
-            yCursorOffset = activeElRect.top - event.clientY;
+            // I add some arbitrary difference to give the effect of the element
+            // snapping out of place, instead of just staying in place silently.
+            xCursorOffset = activeElRect.left - event.clientX + 16;
+            yCursorOffset = activeElRect.top - event.clientY - 4;
             xDragClientPos = xLast + xCursorOffset;
             yDragClientPos = yLast + yCursorOffset;
 
