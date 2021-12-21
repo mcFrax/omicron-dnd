@@ -4,6 +4,14 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <title>JS Test</title>
     <style>
+        html,
+        body {
+            /* Prevent the scroll-to-refresh behavior and the effect
+             * of bumping into the sroll end on mobile. */
+            /* Would be nice to set it dynamically during drag, but let's
+             * not overdo it yet. */
+            overscroll-behavior-y: none;
+        }
         .scroll-container {
             width: 400px;
             height: 80vh;
@@ -224,7 +232,6 @@
             Anim.start(fromEl, itemsAfter, activeToPlaceholderOffset, animMs);
         }
         function drag_window_MouseMove(event) {
-            console.log('drag_window_MouseMove');
             let isTouch = Boolean(event.touches);
             let evPlace;  // The object with clientX and clientY.
             if (isTouch) {
@@ -237,7 +244,6 @@
             }
 
             event.stopPropagation();
-            event.preventDefault();
 
             // assert((event.buttons & 1) === 1)
 
@@ -367,8 +373,6 @@
         }
 
         function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
-            console.log('moveInsideContainer', newNewIndex);
-
             // There are 4 groups of elements, adjusted by different offsets:
             //
             // 1. no offset
