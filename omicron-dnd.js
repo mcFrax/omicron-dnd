@@ -178,21 +178,29 @@
       }
   }
 
-  function findUpdatedNewIndex(mouseY) {
+  // By default, we optimize the search by going only from the current index
+  // in the direction of mouseY, and only when the move is outside of
+  // precomputed zone where we know no move happened. When ignoreCurrentNewIndex
+  // is true, we ignore both optimization, which is useful for computing
+  // the index in a new container.
+  function findUpdatedNewIndex(mouseY, ignoreCurrentNewIndex) {
     let updatedNewIndex = newIndex;
 
     let wiggleZoneSize = 0.5;
     let snapMargin = (1 - wiggleZoneSize) / 2;
     let bottomSnapBorder = yDirection === -1 ? (1 - snapMargin) : snapMargin;
     let itemsInContainer = toEl.children.length - ((toEl === fromEl) ? 2 : 1);
-    if (mouseY < yStartNoMoveZone && newIndex !== 0) {
+    if (ignoreCurrentNewIndex || mouseY < yStartNoMoveZone && newIndex !== 0) {
         // Correct for the fact that if we dragged the element down from
         // its place, some elements above it are shifted from their
         // offset position.
         let offsetCorrection = toEl === fromEl ? activeToNothingOffset : 0;
         updatedNewIndex = 0;
         // We may look up one extra element at the start, but that is not an issue.
-        let iterationStart = Math.min(newIndex, itemsInContainer - 1);
+        let iterationStart = itemsInContainer - 1;
+        if (!ignoreCurrentNewIndex && newIndex < iterationStart) {
+          iterationStart
+        }
         for (let i = iterationStart; i >= 0; --i) {
             let otherEl = toEl.children[i];
             if (otherEl === activeEl) continue;
@@ -216,8 +224,7 @@
                 break;
             }
         }
-    }
-    if (mouseY > yEndNoMoveZone) {
+    } else if (mouseY > yEndNoMoveZone) {
         let offsetCorrection = nothingToPlaceholderOffset;
         // Set to the highest possible value - in case we are at the very
         // bottom of the container.
