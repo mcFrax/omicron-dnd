@@ -172,6 +172,11 @@
             if (!isTouch && event.button !== 0) {
                 return;
             }
+            if (isTouch && event.touches.length > 1) {
+                // TODO: Actually, we should just prevent more than one touch,
+                // as Sortable does.
+                return; // Don't drag if it's a second touchpoint.
+            }
             let evPlace;  // The object with clientX and clientY.
             if (isTouch) {
                 evPlace = event.changedTouches.item(0);
