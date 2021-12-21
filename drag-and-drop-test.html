@@ -388,23 +388,47 @@
             floatEl.remove();  // Removing this element now saves some special casing.
 
             if (execSort && (newIndex !== oldIndex || toEl !== fromEl)) {
+                // Note:
+                // We need to adjust the position of elements with transform
+                // to avoid shifting them around suddenly. It would be nice
+                // to do that in one go for each element, but that would involve
+                // several cases and so on. I'll just do that as I go, and not
+                // worry that I do that twice for some elements most of the time.
+
                 activeEl.remove();
+
+                // Adjust elements after removed and animate them to 0.
+                for (let elem of Array.from(fromEl.children).slice(oldIndex, -1)) {
+                    let currentTransform = (transformsByElem.get(elem) || [0, 0]);
+                    currentTransform[1] -= activeToNothingOffset;
+                    if (currentTransform[0] !== 0 || currentTransform[1] !== 0) {
+                        transformsByElem.set(elem, currentTransform);
+                    }
+                    Anim.start(fromEl, [elem], 0, animMs, currentTransform[1]);
+                }
+
+
                 // Thanks to the placeholder, we don't need to special case
                 // inserting at the last place, as it is always before the
                 // placeholder.
                 toEl.children[newIndex].before(activeEl);
 
-                // TODO: adjust the current transforms and actually pass them
-                // to anim to enforce the correct animation start.
-
-                //(transformsByElem.get(elem) || [0, 0])[1]
+                // Adjust elements after inserted and animate them to 0.
+                for (let elem of Array.from(toEl.children).slice(newIndex + 1, -1)) {
+                    let currentTransform = (transformsByElem.get(elem) || [0, 0]);
+                    currentTransform[1] += activeToNothingOffset;
+                    if (currentTransform[0] !== 0 || currentTransform[1] !== 0) {
+                        transformsByElem.set(elem, currentTransform);
+                    }
+                    Anim.start(fromEl, [elem], 0, animMs, currentTransform[1]);
+                }
+            } else {
+                // When cancelling, let's simply tell everyone to go home.
+                for (let cont of [fromEl, toEl]) {
+                    let itemsArray = Array.from(cont.children).slice(0, -1);
+                    Anim.start(cont, itemsArray, 0, animMs);
+                }
             }
-
-            // Although there may be many elements moving, the only group that
-            // is not going into the right place yet are the elements after the
-            // inserted/reverted element.
-            let itemsArray = Array.from(fromEl.children).slice(0, -1);
-            Anim.start(fromEl, itemsArray, 0, animMs);
 
             // Our Anim handles only y animation for now, we should fix that.
             // However, let's at least handle the y.
