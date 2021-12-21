@@ -12,6 +12,10 @@
              * not overdo it yet. */
             overscroll-behavior-y: none;
         }
+        .horizontal-layout {
+            display: flex;
+            flex-direction: row;
+        }
         .scroll-container {
             width: 400px;
             height: 80vh;
@@ -62,6 +66,14 @@
         .green {
             background: lightgreen;
         }
+        .black {
+            background: darkslategray;
+            color: whitesmoke;
+        }
+        .dark {
+            background: darkgray;
+            color: whitesmoke;
+        }
         .drag-placeholder {
             position: absolute;
             left: 18px; /* padding + item's margin */
@@ -82,21 +94,34 @@
         <input type="number" value="2" min="1", max="1000" id="greenNumber">
         <button onclick="addGreenItemsButtonClick()">Add items</button>
     </div>
-    <div class="scroll-container">
-        <div class="drag-container">
-            <div class="item blue">
-                ITEM
+    <div class="horizontal-layout">
+        <div class="scroll-container">
+            <div class="drag-container">
+                <div class="item blue">
+                    ITEM
+                </div>
+                <div class="item purple">
+                    ITEM
+                </div>
+                <div class="item pink">
+                    ITEM
+                </div>
+                <div class="item red">
+                    ITEM
+                </div>
+                <div class="drag-placeholder"></div>
             </div>
-            <div class="item purple">
-                ITEM
+        </div>
+        <div class="scroll-container">
+            <div class="drag-container">
+                <div class="item black">
+                    ITEM
+                </div>
+                <div class="item dark">
+                    ITEM
+                </div>
+                <div class="drag-placeholder"></div>
             </div>
-            <div class="item pink">
-                ITEM
-            </div>
-            <div class="item red">
-                ITEM
-            </div>
-            <div class="drag-placeholder"></div>
         </div>
     </div>
     <script src="./omicron-dnd.js"></script>
