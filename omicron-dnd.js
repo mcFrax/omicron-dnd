@@ -162,115 +162,120 @@
           animFrameRequestId = requestAnimationFrame(animationFrame);
       }
 
-      // TODO: extract the logic below to the common handling for mousemove and mouseenter.
-      // This will include replacing newIndex with a "baseIndex" or something,
-      // and the yStartNoMoveZone/yEndNoMoveZone must be updated accordingly.
-      // Perhaps the toEl should be replaced with a newToEl as argument
-      // to avoid a brittle global variable dependency.
-
-      let updatedNewIndex = newIndex;
-
-      let wiggleZoneSize = 0.5;
-      let snapMargin = (1 - wiggleZoneSize) / 2;
-      let bottomSnapBorder = yDirection === -1 ? (1 - snapMargin) : snapMargin;
       let mouseY = evPlace.clientY - toEl.getClientRects()[0].top;
-      let itemsInContainer = toEl.children.length - ((toEl === fromEl) ? 2 : 1);
-      if (mouseY < yStartNoMoveZone && newIndex !== 0) {
-          // Correct for the fact that if we dragged the element down from
-          // its place, some elements above it are shifted from their
-          // offset position.
-          let offsetCorrection = toEl === fromEl ? activeToNothingOffset : 0;
-          updatedNewIndex = 0;
-          // We may look up one extra element at the start, but that is not an issue.
-          let iterationStart = Math.min(newIndex, itemsInContainer - 1);
-          for (let i = iterationStart; i >= 0; --i) {
-              let otherEl = toEl.children[i];
-              if (otherEl === activeEl) continue;
-              if (i < oldIndex) {
-                  // We could check for (toEl === fromEl) here, but the
-                  // value is going to be 0 anyway.
-                  offsetCorrection = 0;
-              }
-              let otherTop = otherEl.offsetTop + offsetCorrection;
-              let otherHeight = otherEl.offsetHeight;
-              if (mouseY > otherTop + bottomSnapBorder * otherHeight) {
-                  // Insert activeEl after otherEl.
-                  if (toEl === fromEl && i > oldIndex) {
-                      // Special new case. otherEl will be moved up
-                      // and end up with index i-1, so inserting after
-                      // it means we will end up with index i.
-                      updatedNewIndex = i;
-                  } else {
-                      updatedNewIndex = i + 1;
-                  }
-                  break;
-              }
-          }
-      }
-      if (mouseY > yEndNoMoveZone) {
-          let offsetCorrection = nothingToPlaceholderOffset;
-          // Set to the highest possible value - in case we are at the very
-          // bottom of the container.
-          updatedNewIndex = (toEl === fromEl) ? itemsInContainer - 1 : itemsInContainer;
-          // We may look up one extra element at the start, but that is not an issue.
-          for (let i = newIndex; i < itemsInContainer; ++i) {
-              let otherEl = toEl.children[i];
-              if (otherEl === activeEl) continue;  // May still happen.
-              if (i > oldIndex && toEl === fromEl) {
-                  offsetCorrection = activeToPlaceholderOffset;
-              }
-              let otherTop = otherEl.offsetTop + offsetCorrection;
-              let otherHeight = otherEl.offsetHeight;
-              if (mouseY < otherTop + bottomSnapBorder * otherHeight) {
-                  // Insert activeEl before otherEl.
-                  if (toEl === fromEl && i > oldIndex) {
-                      // Special new case. otherEl won't be bumped to i+1
-                      // but instead back to i-th position when we
-                      // re-insert activeEl, so the inserting splice
-                      // will be at position i-1, not i.
-                      updatedNewIndex = i - 1;
-                  } else {
-                      updatedNewIndex = i;
-                  }
-                  break;
-              }
-          }
-      }
+
+      let updatedNewIndex = findUpdatedNewIndex(mouseY);
+
       if (updatedNewIndex != newIndex) {
           let previousIndex = newIndex;
           newIndex = updatedNewIndex;
           animateMoveInsideContainer(toEl, previousIndex, updatedNewIndex);
 
-          let ref, offsetCorrection;
-          if (itemsInContainer === 0) {
-              // We don't have any reference, it will just be at the top.
-              // However, the offsetCorrection should probably account for
-              // margin/padding.
-              ref = null;
-              offsetCorrection = 0;
-          } else if (toEl === fromEl && newIndex === itemsInContainer - 1) {
-              // Last element in fromEl.
-              ref = toEl.children[itemsInContainer-1];
-              // Position the placeholder _after_ the ref.
-              offsetCorrection = ref.offsetHeight + 8 + activeToNothingOffset;
-          } else if (toEl !== fromEl && newIndex === itemsInContainer) {
-              // Last element, not in fromEl.
-              ref = toEl.children[itemsInContainer-1];
-              // Position the placeholder _after_ the ref.
-              offsetCorrection = ref.offsetHeight + 8;
-          } else if (toEl === fromEl && newIndex > oldIndex) {
-              ref = toEl.children[newIndex + 1]
-              offsetCorrection = activeToNothingOffset;
-          } else {
-              ref = toEl.children[newIndex]
-              offsetCorrection = 0;
-          }
-          // This will be the new activeEl top, once we move it.
-          let newPlaceholderTop = ref ? ref.offsetTop + offsetCorrection : offsetCorrection;
+          let newPlaceholderTop = findPlaceholderTop();
           yStartNoMoveZone = newPlaceholderTop - 8;
           yEndNoMoveZone = newPlaceholderTop - nothingToPlaceholderOffset;
           placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
       }
+  }
+
+  function findUpdatedNewIndex(mouseY) {
+    let updatedNewIndex = newIndex;
+
+    let wiggleZoneSize = 0.5;
+    let snapMargin = (1 - wiggleZoneSize) / 2;
+    let bottomSnapBorder = yDirection === -1 ? (1 - snapMargin) : snapMargin;
+    let itemsInContainer = toEl.children.length - ((toEl === fromEl) ? 2 : 1);
+    if (mouseY < yStartNoMoveZone && newIndex !== 0) {
+        // Correct for the fact that if we dragged the element down from
+        // its place, some elements above it are shifted from their
+        // offset position.
+        let offsetCorrection = toEl === fromEl ? activeToNothingOffset : 0;
+        updatedNewIndex = 0;
+        // We may look up one extra element at the start, but that is not an issue.
+        let iterationStart = Math.min(newIndex, itemsInContainer - 1);
+        for (let i = iterationStart; i >= 0; --i) {
+            let otherEl = toEl.children[i];
+            if (otherEl === activeEl) continue;
+            if (i < oldIndex) {
+                // We could check for (toEl === fromEl) here, but the
+                // value is going to be 0 anyway.
+                offsetCorrection = 0;
+            }
+            let otherTop = otherEl.offsetTop + offsetCorrection;
+            let otherHeight = otherEl.offsetHeight;
+            if (mouseY > otherTop + bottomSnapBorder * otherHeight) {
+                // Insert activeEl after otherEl.
+                if (toEl === fromEl && i > oldIndex) {
+                    // Special new case. otherEl will be moved up
+                    // and end up with index i-1, so inserting after
+                    // it means we will end up with index i.
+                    updatedNewIndex = i;
+                } else {
+                    updatedNewIndex = i + 1;
+                }
+                break;
+            }
+        }
+    }
+    if (mouseY > yEndNoMoveZone) {
+        let offsetCorrection = nothingToPlaceholderOffset;
+        // Set to the highest possible value - in case we are at the very
+        // bottom of the container.
+        updatedNewIndex = (toEl === fromEl) ? itemsInContainer - 1 : itemsInContainer;
+        // We may look up one extra element at the start, but that is not an issue.
+        for (let i = newIndex; i < itemsInContainer; ++i) {
+            let otherEl = toEl.children[i];
+            if (otherEl === activeEl) continue;  // May still happen.
+            if (i > oldIndex && toEl === fromEl) {
+                offsetCorrection = activeToPlaceholderOffset;
+            }
+            let otherTop = otherEl.offsetTop + offsetCorrection;
+            let otherHeight = otherEl.offsetHeight;
+            if (mouseY < otherTop + bottomSnapBorder * otherHeight) {
+                // Insert activeEl before otherEl.
+                if (toEl === fromEl && i > oldIndex) {
+                    // Special new case. otherEl won't be bumped to i+1
+                    // but instead back to i-th position when we
+                    // re-insert activeEl, so the inserting splice
+                    // will be at position i-1, not i.
+                    updatedNewIndex = i - 1;
+                } else {
+                    updatedNewIndex = i;
+                }
+                break;
+            }
+        }
+    }
+    return updatedNewIndex;
+  }
+
+  function findPlaceholderTop() {
+    let ref, offsetCorrection;
+    if (itemsInContainer === 0) {
+        // We don't have any reference, it will just be at the top.
+        // However, the offsetCorrection should probably account for
+        // margin/padding.
+        ref = null;
+        offsetCorrection = 0;
+    } else if (toEl === fromEl && newIndex === itemsInContainer - 1) {
+        // Last element in fromEl.
+        ref = toEl.children[itemsInContainer-1];
+        // Position the placeholder _after_ the ref.
+        offsetCorrection = ref.offsetHeight + 8 + activeToNothingOffset;
+    } else if (toEl !== fromEl && newIndex === itemsInContainer) {
+        // Last element, not in fromEl.
+        ref = toEl.children[itemsInContainer-1];
+        // Position the placeholder _after_ the ref.
+        offsetCorrection = ref.offsetHeight + 8;
+    } else if (toEl === fromEl && newIndex > oldIndex) {
+        ref = toEl.children[newIndex + 1]
+        offsetCorrection = activeToNothingOffset;
+    } else {
+        ref = toEl.children[newIndex]
+        offsetCorrection = 0;
+    }
+    // This will be the new activeEl's top as well, once we move it.
+    return ref ? ref.offsetTop + offsetCorrection : offsetCorrection;
   }
 
   function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
