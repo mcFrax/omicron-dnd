@@ -314,8 +314,15 @@
       let newIndex = 'DEATH AND DESTRUCTION!';
 
       let inFromEl = (fromEl === containerEl);
-      let affectedStart = Math.min(newNewIndex, previousIndex);
-      let affectedEnd = Math.max(newNewIndex, previousIndex);
+      let maxItemIndex = getItemsInContainer(containerEl) - 1;
+      let affectedStart =
+          Math.min(maxItemIndex, Math.min(newNewIndex, previousIndex));
+      let affectedEnd =
+          Math.min(maxItemIndex, Math.max(newNewIndex, previousIndex));
+
+      if (maxItemIndex === -1) {
+        return; // Empty container, nothing to animate.
+      }
 
       // Note: we are using actual oldIndex below, not previousIndex.
       // This is because we have to deal with activeEl affecting offsets,
@@ -462,10 +469,7 @@
           if (anims[i].animationFrame(timestamp)) {
               needsNextFrame = true;
           } else {
-              for (let elem of anims[i].elems) {
-                  animsByElem.delete(elem);
-              }
-              anims.splice(i, 1);
+              anims[i].remove();
           }
       }
       if (needsNextFrame) {
@@ -489,6 +493,9 @@
       return null;
   }
 
+  // Anim is implemented to hold an array of elems, but we actually rely on it
+  // holding only one (which means we can delete the whole old anim when adding
+  // new one for the same element).
   class Anim {
       static start(parentEl, elems, targetYTranslation, durationMs, startYTranslation) {
           // How the actual, visible position differs from offsetTop.
@@ -501,7 +508,12 @@
               for (let elem of elems) {
                   startYTranslation = (transformsByElem.get(elem) || [0, 0])[1];
                   if (startYTranslation !== targetYTranslation) {
-                      Anim.add(elem, new Anim(parentEl, [elem], startYTranslation, targetYTranslation, durationMs));
+                    Anim.add(elem, new Anim(parentEl, [elem], startYTranslation, targetYTranslation, durationMs));
+                  } else {
+                    let currentAnim = animsByElem.get(elem);
+                    if (currentAnim) {
+                      currentAnim.remove();
+                    }
                   }
               }
           } else {
@@ -521,9 +533,10 @@
           // Replace any old anim for this elem.
           let previousAnim = animsByElem.get(elem);
           if (previousAnim) {
-              anims.splice(anims.indexOf(previousAnim), 1);
+              anims[anims.indexOf(previousAnim)] = anim;
+          } else {
+            anims.push(anim);
           }
-          anims.push(anim);
           animsByElem.set(elem, anim);
       }
 
@@ -559,6 +572,14 @@
               elem.style.transform = transformString;
           }
           return (advancementRate < 1);
+      }
+
+      remove() {
+        for (let elem of this.elems) {
+          animsByElem.delete(elem);
+        }
+        anims[anims.indexOf(this)] = anims[anims.length - 1];
+        anims.pop();
       }
   }
 
