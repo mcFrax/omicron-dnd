@@ -28,7 +28,7 @@
             overflow: visible; /* for the placeholder to be visible when hanging from the bottom */
             padding: 10px;
         }
-        .item {
+        .card {
             position: relative; /* for z-index to work */
             z-index: 2; /* above placeholder */
             padding: 10px;
@@ -63,6 +63,22 @@
             background: darkgray;
             color: whitesmoke;
         }
+        #modules-warning {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 10%;
+            top: 10%;
+            width: calc(80% - 20vh);
+            height: calc(80% - 20vh);
+            border: 10vh solid tomato;
+            background: white;
+
+            font-size: 4rem;
+            font-weight: bold;
+            font-family: Arial, Helvetica, sans-serif;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -74,36 +90,46 @@
     <div class="horizontal-layout">
         <div class="scroll-container">
             <div class="drag-container">
-                <div class="item blue">
+                <div class="card blue">
                     ITEM
                 </div>
-                <div class="item purple">
+                <div class="card purple">
                     ITEM
                 </div>
-                <div class="item pink">
+                <div class="card pink">
                     ITEM
                 </div>
-                <div class="item red">
+                <div class="card red">
                     ITEM
                 </div>
             </div>
         </div>
         <div class="scroll-container">
             <div class="drag-container">
-                <div class="item black">
+                <div class="card black">
                     ITEM
                 </div>
-                <div class="item dark">
+                <div class="card dark">
                     ITEM
                 </div>
             </div>
         </div>
+        <div id="modules-warning">
+            <p>
+                Unfortunately, ES6 modules don't work in files open from
+                disk. Start a python server instead, and open the page
+                through network.
+            </p>
+            <code>
+                python3 -m http.server
+            </code>
+        </div>
     </div>
-    <script src="./omicron-dnd.js"></script>
-    <script>
+    <script type="module">
+        import OmicronDnd from './omicron-dnd.js';
+
         let $ = (s) => document.querySelector(s);
         let $$ = (s) => Array.from(document.querySelectorAll(s));
-
 
         function addGreenItemsButtonClick() {
             addGreenItems(parseInt($('#greenNumber').value));
@@ -111,7 +137,7 @@
 
         function addGreenItem() {
             let el = document.createElement('div');
-            el.classList.add('item');
+            el.classList.add('card');
             el.classList.add('green');
             el.textContent = 'ITEM';
             $('.drag-container').appendChild(el);
@@ -127,6 +153,11 @@
         addGreenItems(4);
         for (let containerEl of $$('.drag-container')) {
             OmicronDnd.init(containerEl);
+        }
+    </script>
+    <script>
+        if (location.protocol === 'file:') {
+            document.getElementById('modules-warning').style.display = 'block';
         }
     </script>
 </body>
