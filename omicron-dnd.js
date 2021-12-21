@@ -33,7 +33,7 @@
 
   function initDragContainer(containerEl) {
       containerEl.addEventListener('mousedown', noDrag_container_MouseDown);
-      containerEl.addEventListener('touchstart', noDrag_container_MouseDown);
+      containerEl.addEventListener('touchstart', noDrag_container_MouseDown, {passive: true});
       containerEl.addEventListener('mouseenter', anyState_container_MouseEnter);
       // There is no touchenter. :(
       // TODO: Work it around with pointerevents or mousemove on all containers.
@@ -81,7 +81,7 @@
           return;
       }
       toEl = fromEl = event.currentTarget;
-      placeholderEl = fromEl.lastElementChild;
+      createPlaceholder();
       // We don't need to remove it from other elements, as there will
       // be no mousedown event until we are done.
       setEvents_noDrag_to_drag();
@@ -96,7 +96,6 @@
       xDragClientPos = xLast + xCursorOffset;
       yDragClientPos = yLast + yCursorOffset;
 
-      const currentItemWidth = getComputedStyle(activeEl).width;
       const dragElHeight = activeEl.offsetHeight;
 
       activeToPlaceholderOffset = placeholderEl.offsetHeight - dragElHeight;
@@ -104,16 +103,11 @@
       nothingToPlaceholderOffset = placeholderEl.offsetHeight + 8;
 
       placeholderEl.style.transform = `translateY(${activeEl.offsetTop}px)`;
-      placeholderEl.style.visibility = 'visible';
+      activatePlaceholder(placeholderEl);
 
-      floatEl = activeEl.cloneNode(true);
-      floatEl.classList.add('drag-float-item');
-      floatEl.style.width = currentItemWidth;
-      floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px)`;
-      fromEl.appendChild(floatEl);
+      createFloatEl();
 
-
-      activeEl.classList.add('drag-active-item');
+      styleActiveEl();
 
       yStartNoMoveZone = activeEl.offsetTop - 8;
       // We need to compute the end from the top, and use placeholder's
@@ -182,7 +176,7 @@
     let wiggleZoneSize = 0.5;
     let snapMargin = (1 - wiggleZoneSize) / 2;
     let bottomSnapBorder = yDirection === -1 ? (1 - snapMargin) : snapMargin;
-    let itemsInContainer = getItemsInContainer(toEl);
+    let itemsInContainer = getItemsInContainerCount(toEl);
     if (ignoreCurrentNewIndex || mouseY < yStartNoMoveZone && newIndex !== 0) {
         // Correct for the fact that if we dragged the element down from
         // its place, some elements above it are shifted from their
@@ -257,7 +251,7 @@
   }
 
   function findPlaceholderTop() {
-    let itemsInContainer = getItemsInContainer(toEl);
+    let itemsInContainer = getItemsInContainerCount(toEl);
     let ref, offsetCorrection;
     if (itemsInContainer === 0) {
         // We don't have any reference, it will just be at the top.
@@ -314,7 +308,7 @@
       let newIndex = 'DEATH AND DESTRUCTION!';
 
       let inFromEl = (fromEl === containerEl);
-      let maxItemIndex = getItemsInContainer(containerEl) - 1;
+      let maxItemIndex = getItemsInContainerCount(containerEl) - 1;
       let affectedStart =
           Math.min(maxItemIndex, Math.min(newNewIndex, previousIndex));
       let affectedEnd =
@@ -413,9 +407,8 @@
       let activeElRect = activeEl.getClientRects()[0];
       Anim.start(activeEl, [activeEl], 0, animMs, yDragClientPos - activeElRect.top);
 
-      activeEl.classList.remove('drag-active-item');
-      placeholderEl.style.visibility = 'hidden';
-      placeholderEl.transform = null;
+      unstyleActiveEl();
+      deactivatePlaceholder();
 
       setEvents_drag_to_noDrag();
 
@@ -440,21 +433,19 @@
       }
 
       // Handle removal from the previous container.
-      placeholderEl.style.visibility = 'hidden';
-      placeholderEl.style.transform = null;
+      deactivatePlaceholder();
 
-      animateMoveInsideContainer(toEl, newIndex, getItemsInContainer(toEl));
+      animateMoveInsideContainer(toEl, newIndex, getItemsInContainerCount(toEl));
 
       // Then handle insertion into the new container.
       toEl = event.currentTarget;
 
       newIndex = findUpdatedNewIndex(event, /*ignoreCurrentNewIndex=*/true);
-      animateMoveInsideContainer(toEl, getItemsInContainer(toEl), newIndex);
+      animateMoveInsideContainer(toEl, getItemsInContainerCount(toEl), newIndex);
 
-      placeholderEl =
-        toEl !== fromEl ? toEl.lastElementChild : floatEl.previousElementSibling;
+      createPlaceholder();
       setPlaceholderAndNoMoveZone();
-      placeholderEl.style.visibility = 'visible';
+      activatePlaceholder();
   }
 
   function animationFrame(timestamp) {
@@ -477,10 +468,88 @@
       }
   }
 
+  function createPlaceholder() {
+    placeholderEl = document.createElement('div');
+    placeholderEl.style.position = 'absolute';
+    placeholderEl.style.top = 0;
+    placeholderEl.style.zIndex = 1;
+    placeholderEl.style.background = 'lightgray';
+    placeholderEl.style.userSelect = 'none';
+    placeholderEl.style.pointerEvents = 'none';
+    placeholderEl.style.visibility = 'hidden';
+    placeholderEl.classList.add('drag-placeholder');
+    toEl.appendChild(placeholderEl);
+    // Set the height only if not set externally.
+    let autoHeight = getComputedStyle(placeholderEl).height;
+    if (!autoHeight || autoHeight === '0px') {
+      placeholderEl.style.height = '20px';
+    }
+  }
+
+  function activatePlaceholder() {
+    placeholderEl.style.left = activeEl.offsetLeft + 'px';
+    placeholderEl.style.width = activeEl.offsetWidth + 'px';
+    placeholderEl.style.visibility = 'visible';
+  }
+
+  function deactivatePlaceholder() {
+    placeholderEl.remove();
+    placeholderEl = null;
+  }
+
+  function styleActiveEl() {
+    // Theoretically some descendants can have visibility set explicitly
+    // to visible and then whey would be visible anyway, so let's double
+    // down with opacity: 0;
+    activeEl.style.visibility = 'hidden';
+    activeEl.style.opacity = 0;
+    activeEl.style.pointerEvents = 'none';
+    activeEl.classList.add('drag-active-item');
+  }
+
+  function unstyleActiveEl() {
+    // Note: if there were any inline styles on the element, uh, we have
+    // just erased them. I think that is resonable to force users to just
+    // deal with it.
+    activeEl.classList.remove('drag-active-item');
+    activeEl.style.visibility = null;
+    activeEl.style.opacity = null;
+    activeEl.style.pointerEvents = null;
+  }
+
+  function createFloatEl() {
+      floatEl = activeEl.cloneNode(true);
+
+      floatEl.style.position = 'fixed';
+      floatEl.style.left = 0;
+      floatEl.style.top = 0;
+      floatEl.style.margin = 0;
+      floatEl.style.zIndex = 10000000;
+      floatEl.style.pointerEvents = 'none';
+
+      floatEl.style.width = getComputedStyle(activeEl).width;
+      floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px)`;
+      floatEl.classList.add('drag-float-item');
+
+      fromEl.appendChild(floatEl);
+  }
+
   // Utils.
 
-  function getItemsInContainer(containerEl) {
-    return containerEl.children.length - ((containerEl === fromEl) ? 2 : 1);
+  function getItemsInContainerCount(containerEl) {
+    let lastIndex = containerEl.children.length - 1;
+    let lastItemCandidate = containerEl.lastElementChild;
+    if (!lastItemCandidate) {
+      return 0;
+    }
+    while (
+        lastItemCandidate && (
+          lastItemCandidate === floatEl ||
+          lastItemCandidate === placeholderEl)) {
+      lastItemCandidate = lastItemCandidate.previousElementSibling;
+      --lastIndex;
+    }
+    return lastIndex + 1;
   }
 
   // Returns null if the touch is not in event.changedTouches.

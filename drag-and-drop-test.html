@@ -40,18 +40,6 @@
             user-select: none;
             cursor: pointer;
         }
-        .item.drag-active-item {
-            visibility: hidden;
-            pointer-events: none;
-        }
-        .item.drag-float-item {
-            position: fixed !important; /* This is required to escape from overflow rules. */
-            left: 0 !important;
-            top: 0 !important;
-            margin: 0 !important;
-            z-index: 10000000 !important;
-            pointer-events: none !important;
-        }
         .blue {
             background: cornflowerblue;
         }
@@ -74,18 +62,6 @@
         .dark {
             background: darkgray;
             color: whitesmoke;
-        }
-        .drag-placeholder {
-            position: absolute;
-            left: 18px; /* padding + item's margin */
-            top: 0;
-            width: calc(100% - 38px);
-            height: 20px;
-            z-index: 1;
-            background: lightgray;
-            user-select: none;
-            pointer-events: none;
-            visibility: hidden;
         }
     </style>
 </head>
@@ -110,7 +86,6 @@
                 <div class="item red">
                     ITEM
                 </div>
-                <div class="drag-placeholder"></div>
             </div>
         </div>
         <div class="scroll-container">
@@ -121,7 +96,6 @@
                 <div class="item dark">
                     ITEM
                 </div>
-                <div class="drag-placeholder"></div>
             </div>
         </div>
     </div>
@@ -140,7 +114,7 @@
             el.classList.add('item');
             el.classList.add('green');
             el.textContent = 'ITEM';
-            $('.drag-placeholder').before(el);
+            $('.drag-container').appendChild(el);
         }
 
         function addGreenItems(count) {
