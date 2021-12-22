@@ -2,7 +2,6 @@ const animMs = 100;
 
 let htmlOvescrollBehavior; // Cached value to be reverted after drag.
 let bodyOvescrollBehavior; // Cached value to be reverted after drag.
-let initialEvent = null;
 let touchDrag = false;
 let fromEl = null;
 let toEl = null;
@@ -14,11 +13,14 @@ let placeholderEl = null;
 // Or at least rename them to reflect the actual semantic.
 let oldIndex = 0;
 let newIndex = 0;
+let initialActiveElRect = null;
 let activeToPlaceholderOffset = 0;
 let activeToNothingOffset = 0;
 let nothingToPlaceholderOffset = 0;
 let xCursorOffset = 0;
 let yCursorOffset = 0;
+let xInitial = 0;
+let yInitial = 0;
 let xLast = 0;
 let yLast = 0;
 let xDragClientPos = 0;
@@ -27,31 +29,49 @@ let yStartNoMoveZone = 0; // When cursor is between yStartNoMoveZone
 let yEndNoMoveZone = 0;   // and yEndNoMoveZone nothing will happen.
 let animFrameRequestId = 0; // 0 is never used as actual id.
 let yDirection = -1;
+let preDragTimeoutId = 0;
 
 let anims = [];
 let animsByElem = new Map();
 // elem => [x, y]; no [0, 0] stored.
 let transformsByElem = new Map();
 
+const minimalMoveMouse = 5;
+const delay = 220;
+
 function initDragContainer(containerEl) {
-    containerEl.addEventListener('mousedown', anyState_container_MouseDown, {passive: false});
-    containerEl.addEventListener('touchstart', anyState_container_MouseDown, {passive: false});
+    containerEl.addEventListener('mousedown', anyState_container_MouseDown);
+    containerEl.addEventListener('touchstart', anyState_container_MouseDown);
     containerEl.addEventListener('mouseenter', anyState_container_MouseEnter);
     // There is no touchenter. :(
     // TODO: Work it around with pointerevents or mousemove on all containers.
     // PointerEvents look preferable anyway, unless there is some big caveat,
     // and seem to have enough support to just assume they are reliable.
 }
-function setEvents_stateNoDrag_to_stateDrag() {
-    window.addEventListener('mousemove', stateDrag_window_MouseMove, true);
-    window.addEventListener('touchmove', stateDrag_window_MouseMove, true);
+function setEvents_statePreDrag() {
+    window.addEventListener('mousemove', statePreDrag_window_MouseMove);
+    window.addEventListener('touchmove', statePreDrag_window_MouseMove);
+    window.addEventListener('mouseup', statePreDrag_window_MouseUp, true);
+    window.addEventListener('touchend', statePreDrag_window_MouseUp, true);
+    window.addEventListener('touchcancel', statePreDrag_window_MouseUp, true);
+}
+function unsetEvents_statePreDrag() {
+    window.removeEventListener('mousemove', statePreDrag_window_MouseMove);
+    window.removeEventListener('touchmove', statePreDrag_window_MouseMove);
+    window.removeEventListener('mouseup', statePreDrag_window_MouseUp, true);
+    window.removeEventListener('touchend', statePreDrag_window_MouseUp, true);
+    window.removeEventListener('touchcancel', statePreDrag_window_MouseUp, true);
+}
+function setEvents_stateDrag() {
+    window.addEventListener('mousemove', stateDrag_window_MouseMove, {passive: false});
+    window.addEventListener('touchmove', stateDrag_window_MouseMove, {passive: false});
     window.addEventListener('mouseup', stateDrag_window_MouseUp, true);
     window.addEventListener('touchend', stateDrag_window_MouseUp, true);
     window.addEventListener('touchcancel', stateDrag_window_MouseUp, true);
 }
-function setEvents_stateDrag_to_stateNoDrag() {
-    window.removeEventListener('mousemove', stateDrag_window_MouseMove, true);
-    window.removeEventListener('touchmove', stateDrag_window_MouseMove, true);
+function unsetEvents_stateDrag() {
+    window.removeEventListener('mousemove', stateDrag_window_MouseMove, {passive: false});
+    window.removeEventListener('touchmove', stateDrag_window_MouseMove, {passive: false});
     window.removeEventListener('mouseup', stateDrag_window_MouseUp, true);
     window.removeEventListener('touchend', stateDrag_window_MouseUp, true);
     window.removeEventListener('touchcancel', stateDrag_window_MouseUp, true);
@@ -63,15 +83,36 @@ function anyState_container_MouseDown(event) {
         return;
     }
 
+    event.stopPropagation();
+
     touchDrag = isTouch;
     activeEl = getItemFromContainerEvent(event);
     if (!activeEl) {
         return;
     }
 
-    initialEvent = event;
-    // Prevent scroll on mobile. TODO: call it only after the delay.
-    initialEvent.preventDefault();
+    toEl = fromEl = event.currentTarget;
+
+    setEvents_statePreDrag();
+
+    xInitial = xLast = evPlace.clientX;
+    yInitial = yLast = evPlace.clientY;
+    initialActiveElRect = activeEl.getClientRects()[0];
+
+    // We are in statePreDrag. We will start the drag after a delay, or if
+    // the mouse moves sufficiently far. We will cancel the drag if the touch
+    // moves too far before the delay.
+    preDragTimeoutId = setTimeout(startDrag, delay);
+}
+function startDrag() {
+    console.log('Drag start');
+    if (preDragTimeoutId) {
+        clearTimeout(preDragTimeoutId);
+        preDragTimeoutId = 0;
+    }
+
+    unsetEvents_statePreDrag();
+    setEvents_stateDrag();
 
     // Prevent the scroll-to-refresh behavior and the effect
     // of bumping into the scroll end on mobile.
@@ -81,21 +122,14 @@ function anyState_container_MouseDown(event) {
     document.documentElement.style.ovescrollBehavior = 'none';
     document.body.style.ovescrollBehavior = 'none';
 
-    toEl = fromEl = event.currentTarget;
-    createPlaceholder();
-    // We don't need to remove it from other elements, as there will
-    // be no mousedown event until we are done.
-    setEvents_stateNoDrag_to_stateDrag();
-
-    xLast = evPlace.clientX;
-    yLast = evPlace.clientY;
-    let activeElRect = activeEl.getClientRects()[0];
     // I add some arbitrary difference to give the effect of the element
     // snapping out of place, instead of just staying in place silently.
-    xCursorOffset = activeElRect.left - evPlace.clientX + 16;
-    yCursorOffset = activeElRect.top - evPlace.clientY - 4;
+    xCursorOffset = initialActiveElRect.left - xInitial + 16;
+    yCursorOffset = initialActiveElRect.top - yInitial - 4;
     xDragClientPos = xLast + xCursorOffset;
     yDragClientPos = yLast + yCursorOffset;
+
+    createPlaceholder();
 
     const activeElHeight = activeEl.offsetHeight;
 
@@ -123,13 +157,46 @@ function anyState_container_MouseDown(event) {
     let itemsAfter = childrenArray.slice(oldIndex + 1, -2);
     Anim.start(fromEl, itemsAfter, activeToPlaceholderOffset, animMs);
 }
+function statePreDrag_window_MouseMove(event) {
+    let evPlace = getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event);
+    if (!evPlace) {
+        return;
+    }
+    if (touchDrag) {
+        // We may not be able to cancel the scroll any more after this event,
+        // so we have to give up the drag.
+        exitDrag(false);
+        return;
+    }
+    xLast = evPlace.clientX;
+    yLast = evPlace.clientY;
+    let xDiff = xLast - xInitial;
+    let yDiff = xLast - xInitial;
+    let distanceSquaredFromInitial = xDiff * xDiff + yDiff * yDiff;
+    if (distanceSquaredFromInitial >  minimalMoveMouse * minimalMoveMouse) {
+        console.log('Drag started after mouse move');
+        startDrag();
+    }
+}
+function statePreDrag_window_MouseUp(event) {
+    // For touchDrag, getRelevantMouseEventOrTouchOrExitOnDoubleTouch will
+    // already call exitDrag(false), but that's what we were going to
+    // call anyway, so it's fine. However, if we ever want more logic here,
+    // it will be necessary to add slightly different event checking.
+    let evPlace = getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event);
+    if (!evPlace || (!touchDrag && event.button !== 0)) {
+        return;
+    }
+    exitDrag(false);
+}
 function stateDrag_window_MouseMove(event) {
     let evPlace = getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event);
     if (!evPlace) {
         return;
     }
 
-    // assert((event.buttons & 1) === 1)
+    // Prevent scroll.
+    event.preventDefault();
 
     // Update the mouse position.
     if (evPlace.clientY !== yLast) {
@@ -336,14 +403,14 @@ function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
 }
 
 function stateDrag_window_MouseUp(event) {
-    // Note: we set the events up so that we get only touch events
-    // when moving by touch, and only mouse when moving by mouse.
-    const isTouch = Boolean(event.touches);
+    // We don't actually need any "place", but this is a common way to verify
+    // that this is a relevant event.
+    let isTouch = Boolean(event.touches);
     if (isTouch !== touchDrag) {
         // Different pointer than what we started the drag with, ignore.
         return;
     }
-    if (!isTouch && event.button !== 0) {
+    if (!touchDrag && event.button !== 0) {
         return;
     }
     // End drag successfully, except when it ended with touchcancel.
@@ -351,9 +418,14 @@ function stateDrag_window_MouseUp(event) {
 }
 
 function exitDrag(execSort) {
+    let animBackFromFloat = Boolean(floatEl);
     if (floatEl) {
         floatEl.remove();  // Removing this element now saves some special casing.
         floatEl = null;
+    }
+    if (preDragTimeoutId) {
+        clearTimeout(preDragTimeoutId);
+        preDragTimeoutId = 0;
     }
 
     if (execSort && (newIndex !== oldIndex || toEl !== fromEl)) {
@@ -399,21 +471,23 @@ function exitDrag(execSort) {
         }
     }
 
-    // Our Anim handles only y animation for now, we should fix that.
-    // However, let's at least handle the y.
-    let activeElRect = activeEl.getClientRects()[0];
-    Anim.start(activeEl, [activeEl], 0, animMs, yDragClientPos - activeElRect.top);
+    if (animBackFromFloat) {
+        // Our Anim handles only y animation for now, we should fix that.
+        // However, let's at least handle the y.
+        let activeElRect = activeEl.getClientRects()[0];
+        Anim.start(activeEl, [activeEl], 0, animMs, yDragClientPos - activeElRect.top);
+    }
 
     unstyleActiveEl();
     deactivatePlaceholder();
 
-    setEvents_stateDrag_to_stateNoDrag();
+    unsetEvents_statePreDrag();
+    unsetEvents_stateDrag();
 
     // Revert the original overscroll behavior.
     document.documentElement.style.ovescrollBehavior = htmlOvescrollBehavior;
     document.body.style.ovescrollBehavior = bodyOvescrollBehavior;
 
-    initialEvent = null;
     activeEl = null;
     floatEl = null;
     fromEl = null;
@@ -494,28 +568,30 @@ placeholderEl.style.visibility = 'visible';
 }
 
 function deactivatePlaceholder() {
-placeholderEl.remove();
-placeholderEl = null;
+    if (placeholderEl) {
+        placeholderEl.remove();
+    }
+    placeholderEl = null;
 }
 
 function styleActiveEl() {
-// Theoretically some descendants can have visibility set explicitly
-// to visible and then whey would be visible anyway, so let's double
-// down with opacity: 0;
-activeEl.style.visibility = 'hidden';
-activeEl.style.opacity = 0;
-activeEl.style.pointerEvents = 'none';
-activeEl.classList.add('drag-active-item');
+    // Theoretically some descendants can have visibility set explicitly
+    // to visible and then whey would be visible anyway, so let's double
+    // down with opacity: 0;
+    activeEl.style.visibility = 'hidden';
+    activeEl.style.opacity = 0;
+    activeEl.style.pointerEvents = 'none';
+    activeEl.classList.add('drag-active-item');
 }
 
 function unstyleActiveEl() {
-// Note: if there were any inline styles on the element, uh, we have
-// just erased them. I think that is resonable to force users to just
-// deal with it.
-activeEl.classList.remove('drag-active-item');
-activeEl.style.visibility = null;
-activeEl.style.opacity = null;
-activeEl.style.pointerEvents = null;
+    // Note: if there were any inline styles on the element, uh, we have
+    // just erased them. I think that is resonable to force users to just
+    // deal with it.
+    activeEl.classList.remove('drag-active-item');
+    activeEl.style.visibility = null;
+    activeEl.style.opacity = null;
+    activeEl.style.pointerEvents = null;
 }
 
 function createFloatEl() {
