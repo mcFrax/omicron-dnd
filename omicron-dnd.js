@@ -1,5 +1,7 @@
 const animMs = 100;
 
+let htmlOvescrollBehavior; // Cached value to be reverted after drag.
+let bodyOvescrollBehavior; // Cached value to be reverted after drag.
 let initialEvent = null;
 let touchId = null;
 let fromEl = null;
@@ -84,6 +86,14 @@ function noDrag_container_MouseDown(event) {
     initialEvent = event;
     // Prevent scroll on mobile. TODO: call it only after the delay.
     initialEvent.preventDefault();
+
+    // Prevent the scroll-to-refresh behavior and the effect
+    // of bumping into the scroll end on mobile.
+    // TODO: call it only after the delay.
+    htmlOvescrollBehavior = document.documentElement.style.ovescrollBehavior;
+    bodyOvescrollBehavior = document.body.style.ovescrollBehavior;
+    document.documentElement.style.ovescrollBehavior = 'none';
+    document.body.style.ovescrollBehavior = 'none';
 
     toEl = fromEl = event.currentTarget;
     createPlaceholder();
@@ -414,6 +424,10 @@ function exitDrag(execSort) {
     deactivatePlaceholder();
 
     setEvents_drag_to_noDrag();
+
+    // Revert the original overscroll behavior.
+    document.documentElement.style.ovescrollBehavior = htmlOvescrollBehavior;
+    document.body.style.ovescrollBehavior = bodyOvescrollBehavior;
 
     initialEvent = null;
     touchId = null;
