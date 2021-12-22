@@ -481,7 +481,7 @@ toEl.appendChild(placeholderEl);
 // Set the height only if not set externally.
 let autoHeight = getComputedStyle(placeholderEl).height;
 if (!autoHeight || autoHeight === '0px') {
-    placeholderEl.style.height = '20px';
+    placeholderEl.style.height = Math.min(activeEl.offsetHeight - 16, 200) + 'px';
 }
 }
 
