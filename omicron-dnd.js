@@ -3,7 +3,7 @@ const animMs = 100;
 let htmlOvescrollBehavior; // Cached value to be reverted after drag.
 let bodyOvescrollBehavior; // Cached value to be reverted after drag.
 let initialEvent = null;
-let touchId = null;
+let touchDrag = false;
 let fromEl = null;
 let toEl = null;
 let activeEl = null;
@@ -34,8 +34,8 @@ let animsByElem = new Map();
 let transformsByElem = new Map();
 
 function initDragContainer(containerEl) {
-    containerEl.addEventListener('mousedown', stateNoDrag_container_MouseDown, {passive: false});
-    containerEl.addEventListener('touchstart', stateNoDrag_container_MouseDown, {passive: false});
+    containerEl.addEventListener('mousedown', anyState_container_MouseDown, {passive: false});
+    containerEl.addEventListener('touchstart', anyState_container_MouseDown, {passive: false});
     containerEl.addEventListener('mouseenter', anyState_container_MouseEnter);
     // There is no touchenter. :(
     // TODO: Work it around with pointerevents or mousemove on all containers.
@@ -43,8 +43,6 @@ function initDragContainer(containerEl) {
     // and seem to have enough support to just assume they are reliable.
 }
 function setEvents_stateNoDrag_to_stateDrag() {
-    // TODO: check for touchId and either set only touch or only mouse
-    // events. No need to have both.
     window.addEventListener('mousemove', stateDrag_window_MouseMove, true);
     window.addEventListener('touchmove', stateDrag_window_MouseMove, true);
     window.addEventListener('mouseup', stateDrag_window_MouseUp, true);
@@ -58,26 +56,31 @@ function setEvents_stateDrag_to_stateNoDrag() {
     window.removeEventListener('touchend', stateDrag_window_MouseUp, true);
     window.removeEventListener('touchcancel', stateDrag_window_MouseUp, true);
 }
-function stateNoDrag_container_MouseDown(event) {
+function anyState_container_MouseDown(event) {
+    let isTouch = Boolean(event.touches);
     if (activeEl !== null) {
+        if (isTouch && touchDrag) {
+            // Fail the current drag.
+            // TODO: it may happen both in drag and preDrag states.
+            exitDrag(false);
+        }
         return; // Another touch/mouse.
     }
-    let isTouch = Boolean(event.touches);
     if (!isTouch && event.button !== 0) {
         return;
     }
-    if (isTouch && event.touches.length > 1) {
+    if (isTouch && event.touches.length !== 1) {
         // TODO: Actually, we should just prevent more than one touch,
         // as Sortable does.
         return; // Don't drag if it's a second touchpoint.
     }
     let evPlace;  // The object with clientX and clientY.
     if (isTouch) {
-        evPlace = event.changedTouches.item(0);
-        touchId = evPlace.identifier;
+        evPlace = event.touches.item(0);
     } else {
         evPlace = event;
     }
+    touchDrag = isTouch;
     activeEl = getItemFromContainerEvent(event);
     if (!activeEl) {
         return;
@@ -139,12 +142,16 @@ function stateNoDrag_container_MouseDown(event) {
 }
 function stateDrag_window_MouseMove(event) {
     let isTouch = Boolean(event.touches);
+    if (isTouch !== touchDrag) {
+        // Different pointer than what we started the drag with, ignore.
+        return;
+    }
     let evPlace;  // The object with clientX and clientY.
     if (isTouch) {
-        evPlace = getChangedTouchById(event, touchId);
-        if (!evPlace) {
-            return; // Another touch is moving.
+        if (event.touches.length !== 1) {
+            exitDrag(false);
         }
+        evPlace = event.touches.item(0);
     } else {
         evPlace = event;
     }
@@ -358,15 +365,16 @@ function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
 function stateDrag_window_MouseUp(event) {
     // Note: we set the events up so that we get only touch events
     // when moving by touch, and only mouse when moving by mouse.
-    const touchEvent = Boolean(event.touches);
-    if (touchEvent && !getChangedTouchById(event, touchId)) {
+    const isTouch = Boolean(event.touches);
+    if (isTouch !== touchDrag) {
+        // Different pointer than what we started the drag with, ignore.
         return;
     }
-    if (!touchEvent && event.button !== 0) {
+    if (!isTouch && event.button !== 0) {
         return;
     }
-    // TODO: handle touchcancel
-    exitDrag(true);
+    // End drag successfully, except when it ended with touchcancel.
+    exitDrag(event.type !== 'touchcancel');
 }
 
 function exitDrag(execSort) {
@@ -430,7 +438,6 @@ function exitDrag(execSort) {
     document.body.style.ovescrollBehavior = bodyOvescrollBehavior;
 
     initialEvent = null;
-    touchId = null;
     activeEl = null;
     floatEl = null;
     fromEl = null;
@@ -555,29 +562,19 @@ function createFloatEl() {
 // Utils.
 
 function getItemsInContainerCount(containerEl) {
-let lastIndex = containerEl.children.length - 1;
-let lastItemCandidate = containerEl.lastElementChild;
-if (!lastItemCandidate) {
-    return 0;
-}
-while (
-    lastItemCandidate && (
-        lastItemCandidate === floatEl ||
-        lastItemCandidate === placeholderEl)) {
-    lastItemCandidate = lastItemCandidate.previousElementSibling;
-    --lastIndex;
-}
-return lastIndex + 1;
-}
-
-// Returns null if the touch is not in event.changedTouches.
-function getChangedTouchById(event, touchId) {
-    for (let touch of event.changedTouches) {
-        if (touch.identifier === touchId) {
-            return touch;
-        }
+    let lastIndex = containerEl.children.length - 1;
+    let lastItemCandidate = containerEl.lastElementChild;
+    if (!lastItemCandidate) {
+        return 0;
     }
-    return null;
+    while (
+        lastItemCandidate && (
+            lastItemCandidate === floatEl ||
+            lastItemCandidate === placeholderEl)) {
+        lastItemCandidate = lastItemCandidate.previousElementSibling;
+        --lastIndex;
+    }
+    return lastIndex + 1;
 }
 
 // Anim is implemented to hold an array of elems, but we actually rely on it
