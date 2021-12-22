@@ -58,28 +58,11 @@ function setEvents_stateDrag_to_stateNoDrag() {
 }
 function anyState_container_MouseDown(event) {
     let isTouch = Boolean(event.touches);
-    if (activeEl !== null) {
-        if (isTouch && touchDrag) {
-            // Fail the current drag.
-            // TODO: it may happen both in drag and preDrag states.
-            exitDrag(false);
-        }
-        return; // Another touch/mouse.
-    }
-    if (!isTouch && event.button !== 0) {
+    let evPlace = getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event);
+    if (!evPlace || (!isTouch && event.button !== 0)) {
         return;
     }
-    if (isTouch && event.touches.length !== 1) {
-        // TODO: Actually, we should just prevent more than one touch,
-        // as Sortable does.
-        return; // Don't drag if it's a second touchpoint.
-    }
-    let evPlace;  // The object with clientX and clientY.
-    if (isTouch) {
-        evPlace = event.touches.item(0);
-    } else {
-        evPlace = event;
-    }
+
     touchDrag = isTouch;
     activeEl = getItemFromContainerEvent(event);
     if (!activeEl) {
@@ -141,19 +124,9 @@ function anyState_container_MouseDown(event) {
     Anim.start(fromEl, itemsAfter, activeToPlaceholderOffset, animMs);
 }
 function stateDrag_window_MouseMove(event) {
-    let isTouch = Boolean(event.touches);
-    if (isTouch !== touchDrag) {
-        // Different pointer than what we started the drag with, ignore.
+    let evPlace = getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event);
+    if (!evPlace) {
         return;
-    }
-    let evPlace;  // The object with clientX and clientY.
-    if (isTouch) {
-        if (event.touches.length !== 1) {
-            exitDrag(false);
-        }
-        evPlace = event.touches.item(0);
-    } else {
-        evPlace = event;
     }
 
     // assert((event.buttons & 1) === 1)
@@ -378,7 +351,10 @@ function stateDrag_window_MouseUp(event) {
 }
 
 function exitDrag(execSort) {
-    floatEl.remove();  // Removing this element now saves some special casing.
+    if (floatEl) {
+        floatEl.remove();  // Removing this element now saves some special casing.
+        floatEl = null;
+    }
 
     if (execSort && (newIndex !== oldIndex || toEl !== fromEl)) {
         // Note:
@@ -560,6 +536,21 @@ function createFloatEl() {
 }
 
 // Utils.
+
+function getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event) {
+    let isTouch = Boolean(event.touches);
+    if (activeEl !== null && isTouch !== touchDrag) {
+        // Different pointer than what we started the drag with, ignore.
+        return;
+    }
+    if (isTouch) {
+        if (event.touches.length !== 1) {
+            exitDrag(false);
+        }
+        return event.touches.item(0);
+    }
+    return event;
+}
 
 function getItemsInContainerCount(containerEl) {
     let lastIndex = containerEl.children.length - 1;
