@@ -1,5 +1,6 @@
 const animMs = 100;
 
+let initialEvent = null;
 let touchId = null;
 let fromEl = null;
 let toEl = null;
@@ -31,8 +32,8 @@ let animsByElem = new Map();
 let transformsByElem = new Map();
 
 function initDragContainer(containerEl) {
-    containerEl.addEventListener('mousedown', noDrag_container_MouseDown);
-    containerEl.addEventListener('touchstart', noDrag_container_MouseDown, {passive: true});
+    containerEl.addEventListener('mousedown', noDrag_container_MouseDown, {passive: false});
+    containerEl.addEventListener('touchstart', noDrag_container_MouseDown, {passive: false});
     containerEl.addEventListener('mouseenter', anyState_container_MouseEnter);
     // There is no touchenter. :(
     // TODO: Work it around with pointerevents or mousemove on all containers.
@@ -79,6 +80,11 @@ function noDrag_container_MouseDown(event) {
     if (!activeEl) {
         return;
     }
+
+    initialEvent = event;
+    // Prevent scroll on mobile. TODO: call it only after the delay.
+    initialEvent.preventDefault();
+
     toEl = fromEl = event.currentTarget;
     createPlaceholder();
     // We don't need to remove it from other elements, as there will
@@ -132,8 +138,6 @@ function drag_window_MouseMove(event) {
     } else {
         evPlace = event;
     }
-
-    event.stopPropagation();
 
     // assert((event.buttons & 1) === 1)
 
@@ -411,6 +415,7 @@ function exitDrag(execSort) {
 
     setEvents_drag_to_noDrag();
 
+    initialEvent = null;
     touchId = null;
     activeEl = null;
     floatEl = null;
@@ -553,7 +558,7 @@ return lastIndex + 1;
 
 // Returns null if the touch is not in event.changedTouches.
 function getChangedTouchById(event, touchId) {
-    for (touch of event.changedTouches) {
+    for (let touch of event.changedTouches) {
         if (touch.identifier === touchId) {
             return touch;
         }
