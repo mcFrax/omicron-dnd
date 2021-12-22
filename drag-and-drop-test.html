@@ -28,6 +28,9 @@
             overflow: visible; /* for the placeholder to be visible when hanging from the bottom */
             padding: 10px;
         }
+        .right .drag-placeholder {
+            height: 60px; /* Override the default for the right container. */
+        }
         .card {
             position: relative; /* for z-index to work */
             z-index: 2; /* above placeholder */
@@ -89,7 +92,7 @@
     </div>
     <div class="horizontal-layout">
         <div class="scroll-container">
-            <div class="drag-container">
+            <div class="drag-container left">
                 <div class="card blue">
                     ITEM
                 </div>
@@ -104,7 +107,7 @@
                 </div>
             </div>
         </div>
-        <div class="scroll-container">
+        <div class="scroll-container right">
             <div class="drag-container">
                 <div class="card black">
                     ITEM

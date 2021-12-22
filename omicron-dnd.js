@@ -133,9 +133,12 @@ function startDrag() {
 
     const activeElHeight = activeEl.offsetHeight;
 
+    // Note: placeholder height may change depending on the container, but
+    // it will always stay the same for fromEl, and activeToX offsets are
+    // only used in fromEl - so we can compute them just once, unlike
+    // nothingToPlaceholderOffset.
     activeToPlaceholderOffset = placeholderEl.offsetHeight - activeElHeight;
     activeToNothingOffset = -activeElHeight - 8;
-    nothingToPlaceholderOffset = placeholderEl.offsetHeight + 8;
 
     placeholderEl.style.transform = `translateY(${activeEl.offsetTop}px)`;
     activatePlaceholder(placeholderEl);
@@ -515,10 +518,11 @@ function anyState_container_MouseEnter(event) {
     // Then handle insertion into the new container.
     toEl = event.currentTarget;
 
+    createPlaceholder();
+
     newIndex = findUpdatedNewIndex(event, /*ignoreCurrentNewIndex=*/true);
     animateMoveInsideContainer(toEl, getItemsInContainerCount(toEl), newIndex);
 
-    createPlaceholder();
     setPlaceholderAndNoMoveZone();
     activatePlaceholder();
 }
@@ -544,21 +548,24 @@ function animationFrame(timestamp) {
 }
 
 function createPlaceholder() {
-placeholderEl = document.createElement('div');
-placeholderEl.style.position = 'absolute';
-placeholderEl.style.top = 0;
-placeholderEl.style.zIndex = 1;
-placeholderEl.style.background = 'lightgray';
-placeholderEl.style.userSelect = 'none';
-placeholderEl.style.pointerEvents = 'none';
-placeholderEl.style.visibility = 'hidden';
-placeholderEl.classList.add('drag-placeholder');
-toEl.appendChild(placeholderEl);
-// Set the height only if not set externally.
-let autoHeight = getComputedStyle(placeholderEl).height;
-if (!autoHeight || autoHeight === '0px') {
-    placeholderEl.style.height = Math.min(activeEl.offsetHeight - 16, 200) + 'px';
-}
+    placeholderEl = document.createElement('div');
+    placeholderEl.style.position = 'absolute';
+    placeholderEl.style.top = 0;
+    placeholderEl.style.zIndex = 1;
+    placeholderEl.style.background = 'lightgray';
+    placeholderEl.style.userSelect = 'none';
+    placeholderEl.style.pointerEvents = 'none';
+    placeholderEl.style.visibility = 'hidden';
+    placeholderEl.classList.add('drag-placeholder');
+    toEl.appendChild(placeholderEl);
+    // Set the height only if not set externally.
+    let autoHeight = getComputedStyle(placeholderEl).height;
+    if (!autoHeight || autoHeight === '0px') {
+        placeholderEl.style.height = Math.min(activeEl.offsetHeight - 16, 200) + 'px';
+    }
+    // nothingToPlaceholderOffset may be different in different containers,
+    // as different containers may have differe placeholder height.
+    nothingToPlaceholderOffset = placeholderEl.offsetHeight + 8;
 }
 
 function activatePlaceholder() {
