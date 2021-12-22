@@ -659,6 +659,9 @@ function getItemFromContainerEvent(event) {
     let containerEl = event.currentTarget;
     let result = null;
     for (let el = event.target; el !== containerEl; el = el.parentElement) {
+        if (el.tagName === 'BUTTON') {
+            return null;
+        }
         result = el;
     }
     // Returns null if the event is directly on the container,
