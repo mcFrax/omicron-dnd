@@ -426,6 +426,10 @@ function exitDrag(execSort) {
         floatEl.remove();  // Removing this element now saves some special casing.
         floatEl = null;
     }
+    if (placeholderEl) {
+        placeholderEl.remove();
+        placeholderEl = null;
+    }
     if (preDragTimeoutId) {
         clearTimeout(preDragTimeoutId);
         preDragTimeoutId = 0;
@@ -442,7 +446,7 @@ function exitDrag(execSort) {
         activeEl.remove();
 
         // Adjust elements after removed and animate them to 0.
-        for (let elem of Array.from(fromEl.children).slice(oldIndex, -1)) {
+        for (let elem of Array.from(fromEl.children).slice(oldIndex)) {
             let currentTransform = (transformsByElem.get(elem) || [0, 0]);
             currentTransform[1] -= activeToNothingOffset;
             if (currentTransform[0] !== 0 || currentTransform[1] !== 0) {
@@ -452,13 +456,14 @@ function exitDrag(execSort) {
         }
 
 
-        // Thanks to the placeholder, we don't need to special case
-        // inserting at the last place, as it is always before the
-        // placeholder.
-        toEl.children[newIndex].before(activeEl);
+        if (newIndex === toEl.children.length) {
+            toEl.appendChild(activeEl);
+        } else {
+            toEl.children[newIndex].before(activeEl);
+        }
 
         // Adjust elements after inserted and animate them to 0.
-        for (let elem of Array.from(toEl.children).slice(newIndex + 1, -1)) {
+        for (let elem of Array.from(toEl.children).slice(newIndex + 1)) {
             let currentTransform = (transformsByElem.get(elem) || [0, 0]);
             currentTransform[1] += activeToNothingOffset;
             if (currentTransform[0] !== 0 || currentTransform[1] !== 0) {
@@ -469,8 +474,7 @@ function exitDrag(execSort) {
     } else {
         // When cancelling, let's simply tell everyone to go home.
         for (let cont of [fromEl, toEl]) {
-            let itemsArray = Array.from(cont.children).slice(0, -1);
-            Anim.start(cont, itemsArray, 0, animMs);
+            Anim.start(cont, Array.from(cont.children), 0, animMs);
         }
     }
 
