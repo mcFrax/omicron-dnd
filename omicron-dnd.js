@@ -34,31 +34,31 @@ let animsByElem = new Map();
 let transformsByElem = new Map();
 
 function initDragContainer(containerEl) {
-    containerEl.addEventListener('mousedown', noDrag_container_MouseDown, {passive: false});
-    containerEl.addEventListener('touchstart', noDrag_container_MouseDown, {passive: false});
+    containerEl.addEventListener('mousedown', stateNoDrag_container_MouseDown, {passive: false});
+    containerEl.addEventListener('touchstart', stateNoDrag_container_MouseDown, {passive: false});
     containerEl.addEventListener('mouseenter', anyState_container_MouseEnter);
     // There is no touchenter. :(
     // TODO: Work it around with pointerevents or mousemove on all containers.
     // PointerEvents look preferable anyway, unless there is some big caveat,
     // and seem to have enough support to just assume they are reliable.
 }
-function setEvents_noDrag_to_drag() {
+function setEvents_stateNoDrag_to_stateDrag() {
     // TODO: check for touchId and either set only touch or only mouse
     // events. No need to have both.
-    window.addEventListener('mousemove', drag_window_MouseMove, true);
-    window.addEventListener('touchmove', drag_window_MouseMove, true);
-    window.addEventListener('mouseup', drag_window_MouseUp, true);
-    window.addEventListener('touchend', drag_window_MouseUp, true);
-    window.addEventListener('touchcancel', drag_window_MouseUp, true);
+    window.addEventListener('mousemove', stateDrag_window_MouseMove, true);
+    window.addEventListener('touchmove', stateDrag_window_MouseMove, true);
+    window.addEventListener('mouseup', stateDrag_window_MouseUp, true);
+    window.addEventListener('touchend', stateDrag_window_MouseUp, true);
+    window.addEventListener('touchcancel', stateDrag_window_MouseUp, true);
 }
-function setEvents_drag_to_noDrag() {
-    window.removeEventListener('mousemove', drag_window_MouseMove, true);
-    window.removeEventListener('touchmove', drag_window_MouseMove, true);
-    window.removeEventListener('mouseup', drag_window_MouseUp, true);
-    window.removeEventListener('touchend', drag_window_MouseUp, true);
-    window.removeEventListener('touchcancel', drag_window_MouseUp, true);
+function setEvents_stateDrag_to_stateNoDrag() {
+    window.removeEventListener('mousemove', stateDrag_window_MouseMove, true);
+    window.removeEventListener('touchmove', stateDrag_window_MouseMove, true);
+    window.removeEventListener('mouseup', stateDrag_window_MouseUp, true);
+    window.removeEventListener('touchend', stateDrag_window_MouseUp, true);
+    window.removeEventListener('touchcancel', stateDrag_window_MouseUp, true);
 }
-function noDrag_container_MouseDown(event) {
+function stateNoDrag_container_MouseDown(event) {
     if (activeEl !== null) {
         return; // Another touch/mouse.
     }
@@ -99,7 +99,7 @@ function noDrag_container_MouseDown(event) {
     createPlaceholder();
     // We don't need to remove it from other elements, as there will
     // be no mousedown event until we are done.
-    setEvents_noDrag_to_drag();
+    setEvents_stateNoDrag_to_stateDrag();
 
     xLast = evPlace.clientX;
     yLast = evPlace.clientY;
@@ -111,10 +111,10 @@ function noDrag_container_MouseDown(event) {
     xDragClientPos = xLast + xCursorOffset;
     yDragClientPos = yLast + yCursorOffset;
 
-    const dragElHeight = activeEl.offsetHeight;
+    const activeElHeight = activeEl.offsetHeight;
 
-    activeToPlaceholderOffset = placeholderEl.offsetHeight - dragElHeight;
-    activeToNothingOffset = -dragElHeight - 8;
+    activeToPlaceholderOffset = placeholderEl.offsetHeight - activeElHeight;
+    activeToNothingOffset = -activeElHeight - 8;
     nothingToPlaceholderOffset = placeholderEl.offsetHeight + 8;
 
     placeholderEl.style.transform = `translateY(${activeEl.offsetTop}px)`;
@@ -137,7 +137,7 @@ function noDrag_container_MouseDown(event) {
     let itemsAfter = childrenArray.slice(oldIndex + 1, -2);
     Anim.start(fromEl, itemsAfter, activeToPlaceholderOffset, animMs);
 }
-function drag_window_MouseMove(event) {
+function stateDrag_window_MouseMove(event) {
     let isTouch = Boolean(event.touches);
     let evPlace;  // The object with clientX and clientY.
     if (isTouch) {
@@ -160,7 +160,7 @@ function drag_window_MouseMove(event) {
     xDragClientPos = xLast + xCursorOffset;
     yDragClientPos = yLast + yCursorOffset;
 
-    // Update the position of dragEl before the next frame.
+    // Update the position of floatEl before the next frame.
     if (!animFrameRequestId) {
         animFrameRequestId = requestAnimationFrame(animationFrame);
     }
@@ -355,7 +355,7 @@ function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
     }
 }
 
-function drag_window_MouseUp(event) {
+function stateDrag_window_MouseUp(event) {
     // Note: we set the events up so that we get only touch events
     // when moving by touch, and only mouse when moving by mouse.
     const touchEvent = Boolean(event.touches);
@@ -423,7 +423,7 @@ function exitDrag(execSort) {
     unstyleActiveEl();
     deactivatePlaceholder();
 
-    setEvents_drag_to_noDrag();
+    setEvents_stateDrag_to_stateNoDrag();
 
     // Revert the original overscroll behavior.
     document.documentElement.style.ovescrollBehavior = htmlOvescrollBehavior;
