@@ -101,7 +101,7 @@
     <h1>Drag&drop test</h1>
     <div>
         <input type="number" value="2" min="1", max="1000" id="greenNumber">
-        <button onclick="addGreenItemsButtonClick()">Add items</button>
+        <button id="add-green-button">Add items</button>
     </div>
     <div class="horizontal-layout">
         <div class="scroll-container">
@@ -181,6 +181,7 @@
         }
 
         // Init.
+        $('#add-green-button').addEventListener('click', addGreenItemsButtonClick);
         addGreenItems(4);
         for (let containerEl of $$('.drag-container')) {
             OmicronDnd.init(containerEl);
