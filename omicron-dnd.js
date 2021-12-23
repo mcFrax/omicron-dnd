@@ -45,13 +45,19 @@ const hoverContainers = new Map();
 // Sorted from the deepest to most shallow (i.e. max to min).
 const hoverContainersByDepth = [];
 
+const defaultOptions = {
+    draggableSelector: null,
+    filterSelector: null,
+    handleSelector: null,
+};
+
 function initDragContainer(containerEl, options) {
     if (containerEl.dataset.omicronDragAndDropContainer) {
         return;  // Ignore repeated calls.
     }
     const containerData = {
         el: containerEl,
-        options: options ? Object.assign({}, options) : {},
+        options: Object.assign({}, defaultOptions, options || {}),
         domDepth: 0, // To be updated dynamically when added to hoverContainers.
         anyState_mouseDown(event) {
             anyState_container_MouseDown(event, containerData);
@@ -109,7 +115,7 @@ function anyState_container_MouseDown(event, containerData) {
     }
 
     touchDrag = isTouch;
-    activeEl = getItemFromContainerEvent(event);
+    activeEl = getItemFromContainerEvent(event, containerData.options);
     if (!activeEl) {
         // TODO: Add an option to .stopPropagation() here as well, to prevent
         // dragging the container by elements, event if not by the handle?
@@ -869,22 +875,25 @@ class Anim {
     }
 }
 
-function getItemFromContainerEvent(event) {
-    // For now let's just find the element that is directly inside container.
-    // We can add a filter for handle on the way if we ever need, check for
-    // filter-in and -out classes, but eventually we just want this direct
-    // child.
+function getItemFromContainerEvent(event, options) {
     let containerEl = event.currentTarget;
     let result = null;
+    let handleFound = false;
     for (let el = event.target; el !== containerEl; el = el.parentElement) {
-        if (el.tagName === 'BUTTON') {
+        if (options.filterSelector && el.matches(options.filterSelector)) {
             return null;
+        }
+        if (options.handleSelector && el.matches(options.handleSelector)) {
+            handleFound = true;
         }
         result = el;
     }
     // Returns null if the event is directly on the container,
     // or the element was filtered out for any reason.
-    if (result && result !== placeholderEl && result.classList.contains('card'))
+    if (result &&
+            result !== placeholderEl &&
+            (!options.draggableSelector || result.matches(options.draggableSelector)) &&
+            (handleFound || !options.handleSelector))
         return result;
     else {
         return null;
