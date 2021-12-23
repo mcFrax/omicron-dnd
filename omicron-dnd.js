@@ -85,14 +85,18 @@ function anyState_container_MouseDown(event) {
         return;
     }
 
-
-    event.stopPropagation();
-
     touchDrag = isTouch;
     activeEl = getItemFromContainerEvent(event);
     if (!activeEl) {
+        // TODO: Add an option to .stopPropagation() here as well, to prevent
+        // dragging the container by elements, event if not by the handle?
         return;
     }
+
+    // Only stop propagation after deciding that something was indeed grabbed.
+    // That allows the nested container to be dragged by contents when using
+    // handle/filter, or just being grabbed by the padding/empty area.
+    event.stopPropagation();
 
     toEl = fromEl = event.currentTarget;
 
