@@ -184,7 +184,11 @@
         $('#add-green-button').addEventListener('click', addGreenItemsButtonClick);
         addGreenItems(4);
         for (let containerEl of $$('.drag-container')) {
-            OmicronDnd.init(containerEl);
+            if (containerEl.classList.contains('nested')) {
+                OmicronDnd.init(containerEl, {enterGuardLeft: 0.4});
+            } else {
+                OmicronDnd.init(containerEl);
+            }
         }
     </script>
     <script>

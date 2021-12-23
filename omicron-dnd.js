@@ -49,6 +49,11 @@ const defaultOptions = {
     draggableSelector: null,
     filterSelector: null,
     handleSelector: null,
+    // Guards without suffix are a rate of width, those with 'px' are in pixels.
+    enterGuardLeft: 0,
+    enterGuardLeftPx: 0,
+    enterGuardRight: 0,
+    enterGuardRightPx: 0,
 };
 
 function initDragContainer(containerEl, options) {
@@ -258,6 +263,16 @@ function stateDrag_window_MouseMove(event) {
     // Update the position of floatEl before the next frame.
     if (!animFrameRequestId) {
         animFrameRequestId = requestAnimationFrame(animationFrame);
+    }
+
+    if (hoverContainersByDepth[0] && hoverContainersByDepth[0].el !== toEl) {
+        // TODO: Make it a loop and allow stacking this behavior instead
+        // of limiting it to the deepest level.
+        if (maybeEnterContainer(hoverContainersByDepth[0], evPlace)) {
+            // enterContainer took take care of handling the new position
+            // and animation, so our work here is done.
+            return;
+        }
     }
 
     if (!toEl) {
@@ -573,7 +588,7 @@ function anyState_container_MouseEnter(event, containerData) {
         return;
     }
 
-    enterContainer(event.currentTarget, event);
+    maybeEnterContainer(containerData, event);
 }
 
 function anyState_container_MouseLeave(event, containerData) {
@@ -587,25 +602,24 @@ function anyState_container_MouseLeave(event, containerData) {
         return // Not relevant.
     }
 
-    let leftContainer = toEl;
-
     leaveContainer();
 
-    for (let el = leftContainer.parentElement; el; el = el.parentElement) {
-        if (el.dataset.omicronDragAndDropContainer) {
-            let rect = el.getClientRects()[0];
-            if (rect.left <= event.clientX &&
-                    rect.right >= event.clientX &&
-                    rect.top <= event.clientY &&
-                    rect.bottom >= event.clientY) {
-                enterContainer(el, event);
-                break;
-            }
-        }
-    }
+    // mousemove handler will figure the container to enter.
+    // TODO: if it gets glitchy, call the mousemove handler here directly.
 }
 
-function enterContainer(newToEl, event) {
+function maybeEnterContainer(containerData, evPlace) {
+    let cData = containerData;
+    let rect = cData.el.getClientRects()[0];
+    if (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
+            xLast <= rect.right - rect.width * cData.options.enterGuardRight - cData.options.enterGuardRightPx) {
+        enterContainer(cData.el, evPlace);
+        return true;
+    }
+    return false;
+}
+
+function enterContainer(newToEl, evPlace) {
     if (toEl !== null) {
         // Handle removal from the previous container.
         leaveContainer();
@@ -616,7 +630,7 @@ function enterContainer(newToEl, event) {
 
     createPlaceholder();
 
-    newIndex = findUpdatedNewIndex(event, /*ignoreCurrentNewIndex=*/true);
+    newIndex = findUpdatedNewIndex(evPlace, /*ignoreCurrentNewIndex=*/true);
     animateMoveInsideContainer(toEl, getItemsInContainerCount(toEl), newIndex);
 
     setPlaceholderAndNoMoveZone();
