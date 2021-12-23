@@ -163,8 +163,8 @@ function startDrag() {
 
     let childrenArray = Array.from(fromEl.children);
     newIndex = oldIndex = childrenArray.indexOf(activeEl);
-    // Skip 2 elements at the end: the placeholder and floatEl.
-    let itemsAfter = childrenArray.slice(oldIndex + 1, -2);
+    // Use getItemsInContainerCount() to skip placeholder at the end.
+    let itemsAfter = childrenArray.slice(oldIndex + 1, getItemsInContainerCount(fromEl));
     Anim.start(fromEl, itemsAfter, activeToPlaceholderOffset, animMs);
 }
 function statePreDrag_window_MouseMove(event) {
