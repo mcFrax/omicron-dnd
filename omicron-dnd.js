@@ -43,6 +43,8 @@ function initDragContainer(containerEl) {
     containerEl.addEventListener('mousedown', anyState_container_MouseDown);
     containerEl.addEventListener('touchstart', anyState_container_MouseDown);
     containerEl.addEventListener('mouseenter', anyState_container_MouseEnter);
+    containerEl.addEventListener('mouseleave', anyState_container_MouseLeave);
+    containerEl.dataset.omicronDragAndDropContainer = '1';
     // There is no touchenter. :(
     // TODO: Work it around with pointerevents or mousemove on all containers.
     // PointerEvents look preferable anyway, unless there is some big caveat,
@@ -82,6 +84,7 @@ function anyState_container_MouseDown(event) {
     if (!evPlace || (!isTouch && event.button !== 0)) {
         return;
     }
+
 
     event.stopPropagation();
 
@@ -514,13 +517,35 @@ function anyState_container_MouseEnter(event) {
         return;
     }
 
+    enterContainer(event.currentTarget, event);
+}
+
+function anyState_container_MouseLeave(event) {
+    if (event.currentTarget !== toEl) {
+        return // Not relevant.
+    }
+    for (let el = toEl; el; el = el.parentElement) {
+        if (el.dataset.omicronDragAndDropContainer) {
+            let rect = el.getClientRects()[0];
+            if (rect.left <= event.clientX &&
+                    rect.right >= event.clientX &&
+                    rect.top <= event.clientY &&
+                    rect.bottom >= event.clientY) {
+                enterContainer(el, event);
+                break;
+            }
+        }
+    }
+}
+
+function enterContainer(newToEl, event) {
     // Handle removal from the previous container.
     deactivatePlaceholder();
 
     animateMoveInsideContainer(toEl, newIndex, getItemsInContainerCount(toEl));
 
     // Then handle insertion into the new container.
-    toEl = event.currentTarget;
+    toEl = newToEl;
 
     createPlaceholder();
 
@@ -561,21 +586,27 @@ function createPlaceholder() {
     placeholderEl.style.pointerEvents = 'none';
     placeholderEl.style.visibility = 'hidden';
     placeholderEl.classList.add('drag-placeholder');
+    // Note: that may be before or after floatEl. Maybe that is the problem?
     toEl.appendChild(placeholderEl);
     // Set the height only if not set externally.
     let autoHeight = getComputedStyle(placeholderEl).height;
     if (!autoHeight || autoHeight === '0px') {
         placeholderEl.style.height = Math.min(activeEl.offsetHeight - 16, 200) + 'px';
     }
+    // TODO: Figure out how to determine these properly. I guess we need to take
+    // the container's clientWidth and make the actual math with margins and
+    // stuff.
+    // For now let's assume that the offsets on activeEl are ok and that
+    // they are the same on both sides.
+    placeholderEl.style.left = activeEl.offsetLeft + 'px';
+    placeholderEl.style.right = activeEl.offsetLeft + 'px';
     // nothingToPlaceholderOffset may be different in different containers,
     // as different containers may have differe placeholder height.
     nothingToPlaceholderOffset = placeholderEl.offsetHeight + 8;
 }
 
 function activatePlaceholder() {
-placeholderEl.style.left = activeEl.offsetLeft + 'px';
-placeholderEl.style.width = activeEl.offsetWidth + 'px';
-placeholderEl.style.visibility = 'visible';
+    placeholderEl.style.visibility = 'visible';
 }
 
 function deactivatePlaceholder() {
@@ -619,7 +650,16 @@ function createFloatEl() {
     floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px)`;
     floatEl.classList.add('drag-float-item');
 
-    fromEl.appendChild(floatEl);
+    // Position fixed is great, but it has limitation: if any ancestor
+    // has transform, perspective, or filter property set other than none,
+    // it becomes the containing block instead of the viewport, and your
+    // perfect plan for positioning gets royally screwed. That is why we
+    // need to put the floatEl directly on document.body.
+    //
+    // We may some day add an option to put it on the container, a counterpart
+    // to Sortable's fallbackOnBody, but for now we just need it outside
+    // and free of any rogue containing block candidates.
+    document.body.appendChild(floatEl);
 }
 
 // Utils.

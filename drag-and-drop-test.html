@@ -24,12 +24,18 @@
         }
         .drag-container {
             position: relative;
-            width: 100%;
             overflow: visible; /* for the placeholder to be visible when hanging from the bottom */
             padding: 10px;
         }
+        .drag-container.nested {
+            margin: 4px;
+            background: whitesmoke;
+        }
         .right .drag-placeholder {
             height: 60px; /* Override the default for the right container. */
+        }
+        .nested.nested .drag-placeholder {
+            height: 20px;
         }
         .card {
             position: relative; /* for z-index to work */
@@ -42,6 +48,10 @@
             text-align: center;
             user-select: none;
             cursor: pointer;
+        }
+        .nested .card {
+            padding: 6px;
+            font-size: 1.4rem;
         }
         .blue {
             background: cornflowerblue;
@@ -57,6 +67,9 @@
         }
         .green {
             background: lightgreen;
+        }
+        .fuchsia {
+            background: fuchsia;
         }
         .black {
             background: darkslategray;
@@ -114,6 +127,17 @@
                 </div>
                 <div class="card dark">
                     ITEM
+                </div>
+                <div class="card fuchsia">
+                    ITEM MAMA
+                    <div class="drag-container nested">
+                        <div class="card blue">
+                            KINDER ITEM
+                        </div>
+                        <div class="card purple">
+                            KINDER ITEM
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
