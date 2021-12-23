@@ -39,11 +39,34 @@ let transformsByElem = new Map();
 const minimalMoveMouse = 5;
 const delay = 220;
 
-function initDragContainer(containerEl) {
-    containerEl.addEventListener('mousedown', anyState_container_MouseDown);
-    containerEl.addEventListener('touchstart', anyState_container_MouseDown);
-    containerEl.addEventListener('mouseenter', anyState_container_MouseEnter);
-    containerEl.addEventListener('mouseleave', anyState_container_MouseLeave);
+// containerEl => containerData
+const hoverContainers = new Map();
+// containerData from containers under mouse.
+// Sorted from the deepest to most shallow (i.e. max to min).
+const hoverContainersByDepth = [];
+
+function initDragContainer(containerEl, options) {
+    if (containerEl.dataset.omicronDragAndDropContainer) {
+        return;  // Ignore repeated calls.
+    }
+    const containerData = {
+        el: containerEl,
+        options: options ? Object.assign({}, options) : {},
+        domDepth: 0, // To be updated dynamically when added to hoverContainers.
+        anyState_mouseDown(event) {
+            anyState_container_MouseDown(event, containerData);
+        },
+        anyState_mouseEnter(event) {
+            anyState_container_MouseEnter(event, containerData);
+        },
+        anyState_mouseLeave(event) {
+            anyState_container_MouseLeave(event, containerData);
+        },
+    };
+    containerEl.addEventListener('mousedown', containerData.anyState_mouseDown);
+    containerEl.addEventListener('touchstart', containerData.anyState_mouseDown);
+    containerEl.addEventListener('mouseenter', containerData.anyState_mouseEnter);
+    containerEl.addEventListener('mouseleave', containerData.anyState_mouseLeave);
     containerEl.dataset.omicronDragAndDropContainer = '1';
     // There is no touchenter. :(
     // TODO: Work it around with pointerevents or mousemove on all containers.
@@ -78,7 +101,7 @@ function unsetEvents_stateDrag() {
     window.removeEventListener('touchend', stateDrag_window_MouseUp, true);
     window.removeEventListener('touchcancel', stateDrag_window_MouseUp, true);
 }
-function anyState_container_MouseDown(event) {
+function anyState_container_MouseDown(event, containerData) {
     let isTouch = Boolean(event.touches);
     let evPlace = getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event);
     if (!evPlace || (!isTouch && event.button !== 0)) {
@@ -99,6 +122,15 @@ function anyState_container_MouseDown(event) {
     event.stopPropagation();
 
     toEl = fromEl = event.currentTarget;
+
+    containerData.domDepth = getDomDepth(fromEl);
+    hoverContainers.set(fromEl, containerData); // Make sure the current container is on the list.
+    if (hoverContainersByDepth.indexOf(containerData) === -1) {
+        hoverContainersByDepth.push(containerData);
+        hoverContainersByDepth.sort(cmpDomDepth);
+    }
+    // Should we go over the whole activeEl subtree and mark the containers there
+    // as inactive? We may need to, actually.
 
     setEvents_statePreDrag();
 
@@ -518,7 +550,14 @@ function exitDrag(execSort) {
     yDirection = -1;
 }
 
-function anyState_container_MouseEnter(event) {
+function anyState_container_MouseEnter(event, containerData) {
+    containerData.domDepth = getDomDepth(event.currentTarget);
+    hoverContainers.set(event.currentTarget, containerData);
+    if (hoverContainersByDepth.indexOf(containerData) === -1) {
+        hoverContainersByDepth.push(containerData);
+        hoverContainersByDepth.sort(cmpDomDepth);
+    }
+
     if (!fromEl) {
         // Not dragging anything, so nothing to do.
         return;
@@ -531,7 +570,13 @@ function anyState_container_MouseEnter(event) {
     enterContainer(event.currentTarget, event);
 }
 
-function anyState_container_MouseLeave(event) {
+function anyState_container_MouseLeave(event, containerData) {
+    hoverContainers.delete(event.currentTarget);
+    let delIdx;
+    if ((delIdx = hoverContainersByDepth.indexOf(containerData)) !== -1) {
+        hoverContainersByDepth.splice(delIdx, 1);
+    }
+
     if (event.currentTarget !== toEl) {
         return // Not relevant.
     }
@@ -688,6 +733,21 @@ function createFloatEl() {
 
 // Utils.
 
+// Compare function for hoverContainersByDepth.
+function cmpDomDepth(a, b) {
+    return b.domDepth - a.domDepth;
+}
+
+// Get elem's depth in the DOM tree.
+// Note: no special handling for elements not attached to actual document.
+function getDomDepth(elem) {
+    let result = 0;
+    for (elem = elem && elem.parentElement; elem; elem = elem.parentElement) {
+        ++result;
+    }
+    return result;
+}
+
 function getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event) {
     let isTouch = Boolean(event.touches);
     if (activeEl !== null && isTouch !== touchDrag) {
@@ -824,7 +884,7 @@ function getItemFromContainerEvent(event) {
     }
     // Returns null if the event is directly on the container,
     // or the element was filtered out for any reason.
-    if (result && result.classList.contains('card'))
+    if (result && result !== placeholderEl && result.classList.contains('card'))
         return result;
     else {
         return null;
