@@ -1,5 +1,8 @@
 const animMs = 100;
 
+let pointerId = null;
+let pointerDownTarget = null;
+let pointerDownExpectingFollowUpSpecificEvent = false;
 let htmlOvescrollBehavior; // Cached value to be reverted after drag.
 let bodyOvescrollBehavior; // Cached value to be reverted after drag.
 let touchDrag = false;
@@ -64,20 +67,27 @@ function initDragContainer(containerEl, options) {
         el: containerEl,
         options: Object.assign({}, defaultOptions, options || {}),
         domDepth: 0, // To be updated dynamically when added to hoverContainers.
+        anyState_pointerDown(event) {
+            anyState_container_PointerDown(event, containerData);
+        },
         anyState_mouseDown(event) {
             anyState_container_MouseDown(event, containerData);
         },
-        anyState_mouseEnter(event) {
-            anyState_container_MouseEnter(event, containerData);
+        anyState_touchDown(event) {
+            anyState_container_TouchDown(event, containerData);
         },
-        anyState_mouseLeave(event) {
-            anyState_container_MouseLeave(event, containerData);
+        anyState_pointerEnter(event) {
+            anyState_container_PointerEnter(event, containerData);
+        },
+        anyState_pointerLeave(event) {
+            anyState_container_PointerLeave(event, containerData);
         },
     };
+    containerEl.addEventListener('pointerdown', containerData.anyState_pointerDown);
     containerEl.addEventListener('mousedown', containerData.anyState_mouseDown);
-    containerEl.addEventListener('touchstart', containerData.anyState_mouseDown);
-    containerEl.addEventListener('mouseenter', containerData.anyState_mouseEnter);
-    containerEl.addEventListener('mouseleave', containerData.anyState_mouseLeave);
+    containerEl.addEventListener('touchstart', containerData.anyState_touchDown);
+    containerEl.addEventListener('pointerenter', containerData.anyState_pointerEnter);
+    containerEl.addEventListener('pointerleave', containerData.anyState_pointerLeave);
     containerEl.dataset.omicronDragAndDropContainer = '1';
     // There is no touchenter. :(
     // TODO: Work it around with pointerevents or mousemove on all containers.
@@ -85,46 +95,103 @@ function initDragContainer(containerEl, options) {
     // and seem to have enough support to just assume they are reliable.
 }
 function setEvents_statePreDrag() {
-    window.addEventListener('mousemove', statePreDrag_window_MouseMove);
-    window.addEventListener('touchmove', statePreDrag_window_MouseMove);
-    window.addEventListener('mouseup', statePreDrag_window_MouseUp, true);
-    window.addEventListener('touchend', statePreDrag_window_MouseUp, true);
-    window.addEventListener('touchcancel', statePreDrag_window_MouseUp, true);
+    if (touchDrag) {
+        // Seems like we need to catch the touchmove from the get-go?
+        window.addEventListener('touchmove', statePreDrag_window_TouchMove);
+    }
+    window.addEventListener('pointermove', statePreDrag_window_PointerMove);
+    window.addEventListener('pointerup', statePreDrag_window_PointerUp, true);
 }
 function unsetEvents_statePreDrag() {
-    window.removeEventListener('mousemove', statePreDrag_window_MouseMove);
-    window.removeEventListener('touchmove', statePreDrag_window_MouseMove);
-    window.removeEventListener('mouseup', statePreDrag_window_MouseUp, true);
-    window.removeEventListener('touchend', statePreDrag_window_MouseUp, true);
-    window.removeEventListener('touchcancel', statePreDrag_window_MouseUp, true);
+    if (touchDrag) {
+        window.removeEventListener('touchmove', statePreDrag_window_TouchMove);
+    }
+    window.removeEventListener('pointermove', statePreDrag_window_PointerMove);
+    window.removeEventListener('pointerup', statePreDrag_window_PointerUp, true);
 }
 function setEvents_stateDrag() {
-    window.addEventListener('mousemove', stateDrag_window_MouseMove, {passive: false});
-    window.addEventListener('touchmove', stateDrag_window_MouseMove, {passive: false});
-    window.addEventListener('mouseup', stateDrag_window_MouseUp, true);
-    window.addEventListener('touchend', stateDrag_window_MouseUp, true);
-    window.addEventListener('touchcancel', stateDrag_window_MouseUp, true);
+    if (touchDrag) {
+        // For preventing multi-touch while dragging.
+        window.addEventListener('touchdown', stateDrag_window_TouchDown);
+        // We need to capture touchmove events in order to call
+        // .preventDefault() on them and stop the scrolling.
+        // Calling .preventDefault() on PointerEvents doesn't do that.
+        window.addEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
+    }
+    window.addEventListener('pointermove', stateDrag_window_PointerMove);
+    window.addEventListener('pointerup', stateDrag_window_PointerUp, true);
 }
 function unsetEvents_stateDrag() {
-    window.removeEventListener('mousemove', stateDrag_window_MouseMove, {passive: false});
-    window.removeEventListener('touchmove', stateDrag_window_MouseMove, {passive: false});
-    window.removeEventListener('mouseup', stateDrag_window_MouseUp, true);
-    window.removeEventListener('touchend', stateDrag_window_MouseUp, true);
-    window.removeEventListener('touchcancel', stateDrag_window_MouseUp, true);
+    if (touchDrag) {
+        window.removeEventListener('touchdown', stateDrag_window_TouchDown);
+        window.removeEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
+    }
+    window.removeEventListener('pointermove', stateDrag_window_PointerMove);
+    window.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
 }
-function anyState_container_MouseDown(event, containerData) {
-    let isTouch = Boolean(event.touches);
-    let evPlace = getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event);
-    if (!evPlace || (!isTouch && event.button !== 0)) {
+function anyState_container_PointerDown(event, containerData) {
+    if (activeEl !== null || pointerId !== null) {
         return;
     }
+    // Check first if the click is going to grab anything. If not, pass it to
+    // the next handler in ancestor container (if there is any).
+    // Otherwise, we would block the PointerEvent->specific event flow for that
+    // ancestor container, while not necessary having a candidate item to grab.
+    if (!getItemFromContainerEvent(event, containerData.options)) {
+        return;
+    }
+    // Pointermove events are by default all captured by the pointerdown's target.
+    // That means no pointerenter/pointerleave events, that we rely on, so
+    // we need to release the pointer capture.
+    // Source: https://stackoverflow.com/questions/27908339/js-touch-equivalent-for-mouseenter
+    event.target.releasePointerCapture(event.pointerId);
+    pointerId = event.pointerId;
+    pointerDownExpectingFollowUpSpecificEvent = true;
+    pointerDownTarget = containerData;
+    setTimeout(cancelPointerWhenNoSpecificEventHappened, 0);
+}
+function cancelPointerWhenNoSpecificEventHappened() {
+    // Perhaps instead we should carry on and assume it is an actual pointer
+    // device, but for now let's play it safe, I don't have any hardware to
+    // test anything else.
+    if (pointerDownExpectingFollowUpSpecificEvent) {
+        pointerId = null;
+        pointerDownExpectingFollowUpSpecificEvent = false;
+    }
+}
+function anyState_container_MouseDown(event, containerData) {
+    if (activeEl !== null || !pointerDownExpectingFollowUpSpecificEvent || containerData !== pointerDownTarget) {
+        return; // Not interesting;
+    }
+    pointerDownExpectingFollowUpSpecificEvent = false; // Specific event found.
+    if (event.button !== 0) {
+        // Not the main button, forget that if was ever pressed.
+        pointerId = null;
+        return;
+    }
+    touchDrag = false;
+    startPreDrag(event, event, containerData);
+}
+function anyState_container_TouchDown(event, containerData) {
+    if (activeEl !== null || !pointerDownExpectingFollowUpSpecificEvent || containerData !== pointerDownTarget) {
+        return; // Not interesting;
+    }
+    pointerDownExpectingFollowUpSpecificEvent = false; // Specific event found.
+    if (event.touches.length !== 1) {
+        // We only handle single finger touches.
+        pointerId = null;
+        return;
+    }
+    touchDrag = true;
+    startPreDrag(event, event.touches.item(0), containerData);
+}
 
-    touchDrag = isTouch;
+function startPreDrag(event, evPlace, containerData) {
     activeEl = getItemFromContainerEvent(event, containerData.options);
     if (!activeEl) {
         // TODO: Add an option to .stopPropagation() here as well, to prevent
         // dragging the container by elements, event if not by the handle?
-        return;
+        return false;
     }
 
     // Only stop propagation after deciding that something was indeed grabbed.
@@ -132,7 +199,7 @@ function anyState_container_MouseDown(event, containerData) {
     // handle/filter, or just being grabbed by the padding/empty area.
     event.stopPropagation();
 
-    toEl = fromEl = event.currentTarget;
+    toEl = fromEl = containerData.el;
 
     containerData.domDepth = getDomDepth(fromEl);
     hoverContainers.set(fromEl, containerData); // Make sure the current container is on the list.
@@ -154,6 +221,7 @@ function anyState_container_MouseDown(event, containerData) {
     // moves too far before the delay.
     preDragTimeoutId = setTimeout(startDrag, delay);
 }
+
 function startDrag() {
     console.log('Drag start');
     if (preDragTimeoutId) {
@@ -167,10 +235,10 @@ function startDrag() {
     // Prevent the scroll-to-refresh behavior and the effect
     // of bumping into the scroll end on mobile.
     // TODO: call it only after the delay.
-    htmlOvescrollBehavior = document.documentElement.style.ovescrollBehavior;
-    bodyOvescrollBehavior = document.body.style.ovescrollBehavior;
-    document.documentElement.style.ovescrollBehavior = 'none';
-    document.body.style.ovescrollBehavior = 'none';
+    htmlOvescrollBehavior = document.documentElement.style.overscrollBehavior;
+    bodyOvescrollBehavior = document.body.style.overscrollBehavior;
+    document.documentElement.style.overscrollBehavior = 'none';
+    document.body.style.overscrollBehavior = 'none';
 
     // I add some arbitrary difference to give the effect of the element
     // snapping out of place, instead of just staying in place silently.
@@ -191,7 +259,7 @@ function startDrag() {
     activeToNothingOffset = -activeElHeight - 8;
 
     placeholderEl.style.transform = `translateY(${activeEl.offsetTop}px)`;
-    activatePlaceholder(placeholderEl);
+    activatePlaceholder();
 
     createFloatEl();
 
@@ -210,9 +278,11 @@ function startDrag() {
     let itemsAfter = childrenArray.slice(oldIndex + 1, getItemsInContainerCount(fromEl));
     Anim.start(fromEl, itemsAfter, activeToPlaceholderOffset, animMs);
 }
-function statePreDrag_window_MouseMove(event) {
-    let evPlace = getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event);
-    if (!evPlace) {
+function statePreDrag_window_TouchMove(event) {
+    // empty, statePreDrag_window_PointerMove does the work
+}
+function statePreDrag_window_PointerMove(event) {
+    if (event.pointerId !== pointerId) {
         return;
     }
     if (touchDrag) {
@@ -221,8 +291,8 @@ function statePreDrag_window_MouseMove(event) {
         exitDrag(false);
         return;
     }
-    xLast = evPlace.clientX;
-    yLast = evPlace.clientY;
+    xLast = event.clientX;
+    yLast = event.clientY;
     let xDiff = xLast - xInitial;
     let yDiff = xLast - xInitial;
     let distanceSquaredFromInitial = xDiff * xDiff + yDiff * yDiff;
@@ -231,32 +301,39 @@ function statePreDrag_window_MouseMove(event) {
         startDrag();
     }
 }
-function statePreDrag_window_MouseUp(event) {
-    // For touchDrag, getRelevantMouseEventOrTouchOrExitOnDoubleTouch will
-    // already call exitDrag(false), but that's what we were going to
-    // call anyway, so it's fine. However, if we ever want more logic here,
-    // it will be necessary to add slightly different event checking.
-    let evPlace = getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event);
-    if (!evPlace || (!touchDrag && event.button !== 0)) {
+function statePreDrag_window_PointerUp(event) {
+    if (event.pointerId !== pointerId) {
         return;
     }
     exitDrag(false);
 }
-function stateDrag_window_MouseMove(event) {
-    let evPlace = getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event);
-    if (!evPlace) {
-        return;
-    }
-
+function stateDrag_window_TouchDown(event) {
+    // We don't allow multi-touch during dragging.
+    exitDrag(false);
+}
+function stateDrag_window_TouchMove(event) {
     // Prevent scroll.
     event.preventDefault();
 
-    // Update the mouse position.
-    if (evPlace.clientY !== yLast) {
-        yDirection = evPlace.clientY > yLast ? 1 : -1;
+    // Once .preventDefault() was called, we don't need this callback any more,
+    // so let's unsubscribe and save some precious mobile resources.
+    window.removeEventListener('pointermove', stateDrag_window_TouchMove, {passive: false});
+}
+function stateDrag_window_PointerMove(event) {
+    if (event.pointerId !== pointerId) {
+        return;
     }
-    xLast = evPlace.clientX;
-    yLast = evPlace.clientY;
+
+    handleMove(event);
+}
+
+function handleMove(evtPoint) {
+    // Update the mouse position.
+    if (evtPoint.clientY !== yLast) {
+        yDirection = event.clientY > yLast ? 1 : -1;
+    }
+    xLast = evtPoint.clientX;
+    yLast = evtPoint.clientY;
     xDragClientPos = xLast + xCursorOffset;
     yDragClientPos = yLast + yCursorOffset;
 
@@ -268,7 +345,7 @@ function stateDrag_window_MouseMove(event) {
     if (hoverContainersByDepth[0] && hoverContainersByDepth[0].el !== toEl) {
         // TODO: Make it a loop and allow stacking this behavior instead
         // of limiting it to the deepest level.
-        if (maybeEnterContainer(hoverContainersByDepth[0], evPlace)) {
+        if (maybeEnterContainer(hoverContainersByDepth[0], evtPoint)) {
             // enterContainer took take care of handling the new position
             // and animation, so our work here is done.
             return;
@@ -279,7 +356,7 @@ function stateDrag_window_MouseMove(event) {
         return;
     }
 
-    let updatedNewIndex = findUpdatedNewIndex(evPlace);
+    let updatedNewIndex = findUpdatedNewIndex(evtPoint);
 
     if (updatedNewIndex != newIndex) {
         let previousIndex = newIndex;
@@ -295,8 +372,8 @@ function stateDrag_window_MouseMove(event) {
 // precomputed zone where we know no move happened. When ignoreCurrentNewIndex
 // is true, we ignore both optimization, which is useful for computing
 // the index in a new container.
-function findUpdatedNewIndex(mouseEventvOrTouch, ignoreCurrentNewIndex) {
-    let mouseY = mouseEventvOrTouch.clientY - toEl.getClientRects()[0].top;
+function findUpdatedNewIndex(evtPoint, ignoreCurrentNewIndex) {
+    let mouseY = evtPoint.clientY - toEl.getClientRects()[0].top;
 
     let updatedNewIndex = newIndex;
 
@@ -469,15 +546,8 @@ function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
     }
 }
 
-function stateDrag_window_MouseUp(event) {
-    // We don't actually need any "place", but this is a common way to verify
-    // that this is a relevant event.
-    let isTouch = Boolean(event.touches);
-    if (isTouch !== touchDrag) {
-        // Different pointer than what we started the drag with, ignore.
-        return;
-    }
-    if (!touchDrag && event.button !== 0) {
+function stateDrag_window_PointerUp(event) {
+    if (event.pointerId !== pointerId) {
         return;
     }
     // End drag successfully, except when it ended with touchcancel,
@@ -562,6 +632,8 @@ function exitDrag(execSort) {
     document.documentElement.style.ovescrollBehavior = htmlOvescrollBehavior;
     document.body.style.ovescrollBehavior = bodyOvescrollBehavior;
 
+    pointerId = null;
+    pointerDownTarget = null;
     activeEl = null;
     floatEl = null;
     fromEl = null;
@@ -571,7 +643,7 @@ function exitDrag(execSort) {
     yDirection = -1;
 }
 
-function anyState_container_MouseEnter(event, containerData) {
+function anyState_container_PointerEnter(event, containerData) {
     containerData.domDepth = getDomDepth(event.currentTarget);
     hoverContainers.set(event.currentTarget, containerData);
     if (hoverContainersByDepth.indexOf(containerData) === -1) {
@@ -591,7 +663,7 @@ function anyState_container_MouseEnter(event, containerData) {
     maybeEnterContainer(containerData, event);
 }
 
-function anyState_container_MouseLeave(event, containerData) {
+function anyState_container_PointerLeave(event, containerData) {
     hoverContainers.delete(event.currentTarget);
     let delIdx;
     if ((delIdx = hoverContainersByDepth.indexOf(containerData)) !== -1) {
@@ -766,21 +838,6 @@ function getDomDepth(elem) {
         ++result;
     }
     return result;
-}
-
-function getRelevantMouseEventOrTouchOrExitOnDoubleTouch(event) {
-    let isTouch = Boolean(event.touches);
-    if (activeEl !== null && isTouch !== touchDrag) {
-        // Different pointer than what we started the drag with, ignore.
-        return;
-    }
-    if (isTouch) {
-        if (event.touches.length !== 1) {
-            exitDrag(false);
-        }
-        return event.touches.item(0);
-    }
-    return event;
 }
 
 function getItemsInContainerCount(containerEl) {
