@@ -223,7 +223,6 @@ function startPreDrag(event, evPlace, containerData) {
 }
 
 function startDrag() {
-    console.log('Drag start');
     if (preDragTimeoutId) {
         clearTimeout(preDragTimeoutId);
         preDragTimeoutId = 0;
@@ -297,7 +296,6 @@ function statePreDrag_window_PointerMove(event) {
     let yDiff = xLast - xInitial;
     let distanceSquaredFromInitial = xDiff * xDiff + yDiff * yDiff;
     if (distanceSquaredFromInitial >  minimalMoveMouse * minimalMoveMouse) {
-        console.log('Drag started after mouse move');
         startDrag();
     }
 }
