@@ -49,6 +49,9 @@ const hoverContainers = new Map();
 // Sorted from the deepest to most shallow (i.e. max to min).
 const hoverContainersByDepth = [];
 
+let forbiddenInsertionIndicesCache = new Map();
+let toElForbiddenIndices = [];
+
 const defaultOptions = {
     draggableSelector: null,
     filterSelector: null,
@@ -58,6 +61,7 @@ const defaultOptions = {
     enterGuardLeftPx: 0,
     enterGuardRight: 0,
     enterGuardRightPx: 0,
+    forbiddenInsertionIndicesFn: null,
 };
 
 function initDragContainer(containerEl, options) {
@@ -395,7 +399,7 @@ function computeScrollerSpeedInput(triggerZone) {
 // By default, we optimize the search by going only from the current index
 // in the direction of mouseY, and only when the move is outside of
 // precomputed zone where we know no move happened. When ignoreCurrentNewIndex
-// is true, we ignore both optimization, which is useful for computing
+// is true, we ignore both optimizations, which is useful for computing
 // the index in a new container.
 function findUpdatedNewIndex(evtPoint, ignoreCurrentNewIndex) {
     // TODO: There is some glitch in how mouseY works after autoscroll.
@@ -671,6 +675,8 @@ function exitDrag(execSort) {
     oldIndex = newIndex = 0;
     yDirection = -1;
     scrollers = [];
+    activeScrollers = [];
+    forbiddenInsertionIndicesCache = new Map();
 }
 
 function anyState_container_PointerEnter(event) {
@@ -897,7 +903,7 @@ function createFloatEl() {
 
 // Utils.
 
-const scrollActivationMargin = 80; // In pixels. TODO: Allow adjusting with element markup.
+const scrollActivationMargin = 60; // In pixels. TODO: Allow adjusting with element markup.
 
 function collectScrollers(elem) {
     let result = [];
@@ -940,14 +946,14 @@ function collectScrollers(elem) {
                     left: rect.left,
                     top: rect.top,
                     right: rect.right,
-                    bottom: rect.top + 40,
+                    bottom: rect.top + scrollActivationMargin,
                 },
                 horizontal: null,
                 vertical: -1, // scrolling up, i.e. scrollTop decreasing
             }, {
                 rect: {
                     left: rect.left,
-                    top: rect.bottom - 40,
+                    top: rect.bottom - scrollActivationMargin,
                     right: rect.right,
                     bottom: rect.bottom,
                 },
