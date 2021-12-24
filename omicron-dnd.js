@@ -58,29 +58,18 @@ const defaultOptions = {
 };
 
 function initDragContainer(containerEl, options) {
-    if (containerEl.dataset.omicronDragAndDropContainer) {
+    if (containerEl.omicronDragAndDropData) {
         return;  // Ignore repeated calls.
     }
     const containerData = {
         el: containerEl,
         options: Object.assign({}, defaultOptions, options || {}),
         domDepth: 0, // To be updated dynamically when added to hoverContainers.
-        anyState_pointerDown(event) {
-            anyState_container_PointerDown(event, containerData);
-        },
-        anyState_pointerEnter(event) {
-            anyState_container_PointerEnter(event, containerData);
-        },
-        anyState_pointerLeave(event) {
-            anyState_container_PointerLeave(event, containerData);
-        },
     };
-    containerEl.addEventListener('pointerdown', containerData.anyState_pointerDown);
-    containerEl.addEventListener('mousedown', containerData.anyState_mouseDown);
-    containerEl.addEventListener('touchstart', containerData.anyState_touchDown);
-    containerEl.addEventListener('pointerenter', containerData.anyState_pointerEnter);
-    containerEl.addEventListener('pointerleave', containerData.anyState_pointerLeave);
-    containerEl.dataset.omicronDragAndDropContainer = '1';
+    containerEl.addEventListener('pointerdown', anyState_container_PointerDown);
+    containerEl.addEventListener('pointerenter', anyState_container_PointerEnter);
+    containerEl.addEventListener('pointerleave', anyState_container_PointerLeave);
+    containerEl.omicronDragAndDropData = containerData;
     // There is no touchenter. :(
     // TODO: Work it around with pointerevents or mousemove on all containers.
     // PointerEvents look preferable anyway, unless there is some big caveat,
@@ -121,12 +110,10 @@ function unsetEvents_stateDrag() {
     window.removeEventListener('pointermove', stateDrag_window_PointerMove);
     window.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
 }
-function anyState_container_PointerDown(event, containerData) {
-    console.log(event, activeEl, pointerId);
+function anyState_container_PointerDown(event) {
     if (activeEl !== null || pointerId !== null) {
         return;
     }
-    console.log(event);
     if (event.pointerType === 'mouse' && event.buttons !== 1) {
         // When using mouse, allow only the main button.
         // event.button on PointerEvent unfortunately doesn't work,
@@ -141,13 +128,13 @@ function anyState_container_PointerDown(event, containerData) {
     // Source: https://stackoverflow.com/questions/27908339/js-touch-equivalent-for-mouseenter
     event.target.releasePointerCapture(event.pointerId);
 
-    if (startPreDrag(event, event, containerData)) {
+    if (startPreDrag(event, event)) {
         pointerId = event.pointerId;
     }
 }
 
 // TODO: Enable fallback event handlers in case PointerEvents are not available.
-// function anyState_container_fallbackMouseDown(event, containerData) {
+// function anyState_container_fallbackMouseDown(event) {
 //     if (activeEl !== null) {
 //         return; // Not interesting;
 //     }
@@ -156,10 +143,10 @@ function anyState_container_PointerDown(event, containerData) {
 //         return;
 //     }
 //     touchDrag = false;
-//     startPreDrag(event, event, containerData);
+//     startPreDrag(event, event);
 // }
 
-// function anyState_container_fallbackTouchDown(event, containerData) {
+// function anyState_container_fallbackTouchDown(event) {
 //     if (activeEl !== null) {
 //         return; // Not interesting;
 //     }
@@ -168,11 +155,12 @@ function anyState_container_PointerDown(event, containerData) {
 //         return;
 //     }
 //     touchDrag = true;
-//     startPreDrag(event, event.touches.item(0), containerData);
+//     startPreDrag(event, event.touches.item(0));
 // }
 
 // Returns true if preDrag actually started.
-function startPreDrag(event, evPlace, containerData) {
+function startPreDrag(event, evPlace) {
+    let containerData = event.currentTarget.omicronDragAndDropData;
     activeEl = getItemFromContainerEvent(event, containerData.options);
     if (!activeEl) {
         // TODO: Add an option to .stopPropagation() here as well, to prevent
@@ -535,9 +523,11 @@ function stateDrag_window_PointerUp(event) {
     if (event.pointerId !== pointerId) {
         return;
     }
-    // End drag successfully, except when it ended with touchcancel,
-    // or we aren't actually in any container.
-    exitDrag(toEl !== null && event.type !== 'touchcancel');
+    // End drag successfully, except when we aren't actually in any container.
+    // TODO: Should we have a special handling for touchcancel? OTOH, I don't
+    // see it showing up in practice. Maybe except when touch becomes a scroll,
+    // but we eliminate that instance.
+    exitDrag(toEl !== null);
 }
 
 function exitDrag(execSort) {
@@ -627,7 +617,8 @@ function exitDrag(execSort) {
     yDirection = -1;
 }
 
-function anyState_container_PointerEnter(event, containerData) {
+function anyState_container_PointerEnter(event) {
+    let containerData = event.currentTarget.omicronDragAndDropData;
     containerData.domDepth = getDomDepth(event.currentTarget);
     hoverContainers.set(event.currentTarget, containerData);
     if (hoverContainersByDepth.indexOf(containerData) === -1) {
@@ -647,7 +638,8 @@ function anyState_container_PointerEnter(event, containerData) {
     maybeEnterContainer(containerData, event);
 }
 
-function anyState_container_PointerLeave(event, containerData) {
+function anyState_container_PointerLeave(event) {
+    let containerData = event.currentTarget.omicronDragAndDropData;
     hoverContainers.delete(event.currentTarget);
     let delIdx;
     if ((delIdx = hoverContainersByDepth.indexOf(containerData)) !== -1) {
