@@ -1,8 +1,6 @@
 const animMs = 100;
 
 let pointerId = null;
-let pointerDownTarget = null;
-let pointerDownExpectingFollowUpSpecificEvent = false;
 let htmlOvescrollBehavior; // Cached value to be reverted after drag.
 let bodyOvescrollBehavior; // Cached value to be reverted after drag.
 let touchDrag = false;
@@ -70,12 +68,6 @@ function initDragContainer(containerEl, options) {
         anyState_pointerDown(event) {
             anyState_container_PointerDown(event, containerData);
         },
-        anyState_mouseDown(event) {
-            anyState_container_MouseDown(event, containerData);
-        },
-        anyState_touchDown(event) {
-            anyState_container_TouchDown(event, containerData);
-        },
         anyState_pointerEnter(event) {
             anyState_container_PointerEnter(event, containerData);
         },
@@ -130,62 +122,56 @@ function unsetEvents_stateDrag() {
     window.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
 }
 function anyState_container_PointerDown(event, containerData) {
+    console.log(event, activeEl, pointerId);
     if (activeEl !== null || pointerId !== null) {
         return;
     }
-    // Check first if the click is going to grab anything. If not, pass it to
-    // the next handler in ancestor container (if there is any).
-    // Otherwise, we would block the PointerEvent->specific event flow for that
-    // ancestor container, while not necessary having a candidate item to grab.
-    if (!getItemFromContainerEvent(event, containerData.options)) {
+    console.log(event);
+    if (event.pointerType === 'mouse' && event.buttons !== 1) {
+        // When using mouse, allow only the main button.
+        // event.button on PointerEvent unfortunately doesn't work,
+        // but event.buttons does.
         return;
     }
+    touchDrag = (event.pointerType === 'touch');
+
     // Pointermove events are by default all captured by the pointerdown's target.
     // That means no pointerenter/pointerleave events, that we rely on, so
     // we need to release the pointer capture.
     // Source: https://stackoverflow.com/questions/27908339/js-touch-equivalent-for-mouseenter
     event.target.releasePointerCapture(event.pointerId);
-    pointerId = event.pointerId;
-    pointerDownExpectingFollowUpSpecificEvent = true;
-    pointerDownTarget = containerData;
-    setTimeout(cancelPointerWhenNoSpecificEventHappened, 0);
-}
-function cancelPointerWhenNoSpecificEventHappened() {
-    // Perhaps instead we should carry on and assume it is an actual pointer
-    // device, but for now let's play it safe, I don't have any hardware to
-    // test anything else.
-    if (pointerDownExpectingFollowUpSpecificEvent) {
-        pointerId = null;
-        pointerDownExpectingFollowUpSpecificEvent = false;
+
+    if (startPreDrag(event, event, containerData)) {
+        pointerId = event.pointerId;
     }
-}
-function anyState_container_MouseDown(event, containerData) {
-    if (activeEl !== null || !pointerDownExpectingFollowUpSpecificEvent || containerData !== pointerDownTarget) {
-        return; // Not interesting;
-    }
-    pointerDownExpectingFollowUpSpecificEvent = false; // Specific event found.
-    if (event.button !== 0) {
-        // Not the main button, forget that if was ever pressed.
-        pointerId = null;
-        return;
-    }
-    touchDrag = false;
-    startPreDrag(event, event, containerData);
-}
-function anyState_container_TouchDown(event, containerData) {
-    if (activeEl !== null || !pointerDownExpectingFollowUpSpecificEvent || containerData !== pointerDownTarget) {
-        return; // Not interesting;
-    }
-    pointerDownExpectingFollowUpSpecificEvent = false; // Specific event found.
-    if (event.touches.length !== 1) {
-        // We only handle single finger touches.
-        pointerId = null;
-        return;
-    }
-    touchDrag = true;
-    startPreDrag(event, event.touches.item(0), containerData);
 }
 
+// TODO: Enable fallback event handlers in case PointerEvents are not available.
+// function anyState_container_fallbackMouseDown(event, containerData) {
+//     if (activeEl !== null) {
+//         return; // Not interesting;
+//     }
+//     if (event.button !== 0) {
+//         // Not the main button, forget that if was ever pressed.
+//         return;
+//     }
+//     touchDrag = false;
+//     startPreDrag(event, event, containerData);
+// }
+
+// function anyState_container_fallbackTouchDown(event, containerData) {
+//     if (activeEl !== null) {
+//         return; // Not interesting;
+//     }
+//     if (event.touches.length !== 1) {
+//         // We only handle single finger touches.
+//         return;
+//     }
+//     touchDrag = true;
+//     startPreDrag(event, event.touches.item(0), containerData);
+// }
+
+// Returns true if preDrag actually started.
 function startPreDrag(event, evPlace, containerData) {
     activeEl = getItemFromContainerEvent(event, containerData.options);
     if (!activeEl) {
@@ -220,6 +206,7 @@ function startPreDrag(event, evPlace, containerData) {
     // the mouse moves sufficiently far. We will cancel the drag if the touch
     // moves too far before the delay.
     preDragTimeoutId = setTimeout(startDrag, delay);
+    return true;
 }
 
 function startDrag() {
@@ -631,7 +618,6 @@ function exitDrag(execSort) {
     document.body.style.ovescrollBehavior = bodyOvescrollBehavior;
 
     pointerId = null;
-    pointerDownTarget = null;
     activeEl = null;
     floatEl = null;
     fromEl = null;
