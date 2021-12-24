@@ -664,6 +664,8 @@ function exitDrag(execSort) {
     unstyleActiveEl();
     deactivatePlaceholder();
 
+    removeBottomPaddingCorrection();
+
     unsetEvents_statePreDrag();
     unsetEvents_stateDrag();
 
@@ -754,6 +756,8 @@ function enterContainer(newToEl, insertionIndex) {
 
     createPlaceholder();
 
+    addBottomPaddingCorrection();
+
     newIndex = insertionIndex;
     animateMoveInsideContainer(toEl, getItemsInContainerCount(toEl), newIndex);
 
@@ -765,6 +769,8 @@ function leaveContainer() {
     deactivatePlaceholder();
 
     animateMoveInsideContainer(toEl, newIndex, getItemsInContainerCount(toEl));
+
+    removeBottomPaddingCorrection();
 
     toEl = null;
 }
@@ -865,6 +871,20 @@ function deactivatePlaceholder() {
         placeholderEl.remove();
     }
     placeholderEl = null;
+}
+
+function addBottomPaddingCorrection() {
+    if (toEl !== fromEl) {
+        toEl.style.paddingBottom =
+            parseFloat(getComputedStyle(toEl).paddingBottom.slice(0, -2)) + nothingToPlaceholderOffset + 'px';
+    }
+}
+
+function removeBottomPaddingCorrection() {
+    if (toEl !== fromEl) {
+        // Reset extended padding.
+        toEl.style.paddingBottom = null;
+    }
 }
 
 function styleActiveEl() {
