@@ -49,8 +49,9 @@ const hoverContainers = new Map();
 // Sorted from the deepest to most shallow (i.e. max to min).
 const hoverContainersByDepth = [];
 
+// elem => [Number]
 let forbiddenInsertionIndicesCache = new Map();
-let toElForbiddenIndices = [];
+let toElForbiddenIndices = null;
 
 const defaultOptions = {
     draggableSelector: null,
@@ -61,6 +62,8 @@ const defaultOptions = {
     enterGuardLeftPx: 0,
     enterGuardRight: 0,
     enterGuardRightPx: 0,
+    // forbiddenInsertionIndicesFn will be called once per container during
+    // each drag, and the result will be cached.
     forbiddenInsertionIndicesFn: null,
 };
 
@@ -181,6 +184,7 @@ function startPreDrag(event, evPlace) {
     event.stopPropagation();
 
     toEl = fromEl = containerData.el;
+    toElForbiddenIndices = getForbiddenInsertionIndices(toEl);
 
     containerData.domDepth = getDomDepth(fromEl);
     hoverContainers.set(fromEl, containerData); // Make sure the current container is on the list.
@@ -345,7 +349,7 @@ function updateOnMove(evtPoint) {
 
     let updatedNewIndex = findUpdatedNewIndex(evtPoint);
 
-    if (updatedNewIndex != newIndex) {
+    if (updatedNewIndex != newIndex && !toElForbiddenIndices.has(updatedNewIndex)) {
         let previousIndex = newIndex;
         newIndex = updatedNewIndex;
         animateMoveInsideContainer(toEl, previousIndex, updatedNewIndex);
@@ -398,26 +402,27 @@ function computeScrollerSpeedInput(triggerZone) {
 
 // By default, we optimize the search by going only from the current index
 // in the direction of mouseY, and only when the move is outside of
-// precomputed zone where we know no move happened. When ignoreCurrentNewIndex
-// is true, we ignore both optimizations, which is useful for computing
-// the index in a new container.
-function findUpdatedNewIndex(evtPoint, ignoreCurrentNewIndex) {
+// precomputed zone where we know no move happened. When insertionContainer
+// is supplied, we ignore both optimizations.
+function findUpdatedNewIndex(evtPoint, insertionContainer) {
+    let ignoreCurrentNewIndex = Boolean(insertionContainer);
+    let containerEl = insertionContainer || toEl;
     // TODO: There is some glitch in how mouseY works after autoscroll.
     // I don't know what the issue is, but there is some shift introduced,
     // perhaps at this place.
-    let mouseY = evtPoint.clientY - toEl.getClientRects()[0].top;
+    let mouseY = evtPoint.clientY - containerEl.getClientRects()[0].top;
 
     let updatedNewIndex = newIndex;
 
     let wiggleZoneSize = 0.5;
     let snapMargin = (1 - wiggleZoneSize) / 2;
     let bottomSnapBorder = yDirection === -1 ? (1 - snapMargin) : snapMargin;
-    let itemsInContainer = getItemsInContainerCount(toEl);
+    let itemsInContainer = getItemsInContainerCount(containerEl);
     if (ignoreCurrentNewIndex || mouseY < yStartNoMoveZone && newIndex !== 0) {
         // Correct for the fact that if we dragged the element down from
         // its place, some elements above it are shifted from their
         // offset position.
-        let offsetCorrection = toEl === fromEl ? activeToNothingOffset : 0;
+        let offsetCorrection = containerEl === fromEl ? activeToNothingOffset : 0;
         updatedNewIndex = 0;
         // We may look up one extra element at the start, but that is not an issue.
         let iterationStart = itemsInContainer - 1;
@@ -425,7 +430,7 @@ function findUpdatedNewIndex(evtPoint, ignoreCurrentNewIndex) {
             iterationStart
         }
         for (let i = iterationStart; i >= 0; --i) {
-            let otherEl = toEl.children[i];
+            let otherEl = containerEl.children[i];
             if (otherEl === activeEl) continue;
             if (i < oldIndex) {
                 // We could check for (toEl === fromEl) here, but the
@@ -436,7 +441,7 @@ function findUpdatedNewIndex(evtPoint, ignoreCurrentNewIndex) {
             let otherHeight = otherEl.offsetHeight;
             if (mouseY > otherTop + bottomSnapBorder * otherHeight) {
                 // Insert activeEl after otherEl.
-                if (toEl === fromEl && i > oldIndex) {
+                if (containerEl === fromEl && i > oldIndex) {
                     // Special new case. otherEl will be moved up
                     // and end up with index i-1, so inserting after
                     // it means we will end up with index i.
@@ -451,19 +456,19 @@ function findUpdatedNewIndex(evtPoint, ignoreCurrentNewIndex) {
         let offsetCorrection = nothingToPlaceholderOffset;
         // Set to the highest possible value - in case we are at the very
         // bottom of the container.
-        updatedNewIndex = (toEl === fromEl) ? itemsInContainer - 1 : itemsInContainer;
+        updatedNewIndex = (containerEl === fromEl) ? itemsInContainer - 1 : itemsInContainer;
         // We may look up one extra element at the start, but that is not an issue.
         for (let i = newIndex; i < itemsInContainer; ++i) {
-            let otherEl = toEl.children[i];
+            let otherEl = containerEl.children[i];
             if (otherEl === activeEl) continue;  // May still happen.
-            if (i > oldIndex && toEl === fromEl) {
+            if (i > oldIndex && containerEl === fromEl) {
                 offsetCorrection = activeToPlaceholderOffset;
             }
             let otherTop = otherEl.offsetTop + offsetCorrection;
             let otherHeight = otherEl.offsetHeight;
             if (mouseY < otherTop + bottomSnapBorder * otherHeight) {
                 // Insert activeEl before otherEl.
-                if (toEl === fromEl && i > oldIndex) {
+                if (containerEl === fromEl && i > oldIndex) {
                     // Special new case. otherEl won't be bumped to i+1
                     // but instead back to i-th position when we
                     // re-insert activeEl, so the inserting splice
@@ -723,13 +728,20 @@ function maybeEnterContainer(containerData, evPlace) {
     let rect = cData.el.getClientRects()[0];
     if (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
             xLast <= rect.right - rect.width * cData.options.enterGuardRight - cData.options.enterGuardRightPx) {
-        enterContainer(cData.el, evPlace);
-        return true;
+        let forbiddenIndices = getForbiddenInsertionIndices(cData.el);
+        let insertionIndex = findUpdatedNewIndex(evPlace, cData.el);
+        if (!forbiddenIndices.has(insertionIndex)) {
+            // Slightly jumping the gun here, as toEl is not yet updated,
+            // but I assume that leaveContainer() won't be looking at that.
+            toElForbiddenIndices = forbiddenIndices;
+            enterContainer(cData.el, insertionIndex);
+            return true;
+        }
     }
     return false;
 }
 
-function enterContainer(newToEl, evPlace) {
+function enterContainer(newToEl, insertionIndex) {
     if (toEl !== null) {
         // Handle removal from the previous container.
         leaveContainer();
@@ -742,7 +754,7 @@ function enterContainer(newToEl, evPlace) {
 
     createPlaceholder();
 
-    newIndex = findUpdatedNewIndex(evPlace, /*ignoreCurrentNewIndex=*/true);
+    newIndex = insertionIndex;
     animateMoveInsideContainer(toEl, getItemsInContainerCount(toEl), newIndex);
 
     setPlaceholderAndNoMoveZone();
@@ -902,6 +914,23 @@ function createFloatEl() {
 }
 
 // Utils.
+
+function getForbiddenInsertionIndices(containerEl) {
+    let cachedValue = forbiddenInsertionIndicesCache.get(containerEl);
+    if (cachedValue) {
+        return cachedValue;
+    }
+    const fn =
+        containerEl.omicronDragAndDropData.options.forbiddenInsertionIndicesFn;
+    let newValue;
+    if (typeof fn === 'function') {
+        newValue = new Set(fn(containerEl, activeEl));
+    } else {
+        newValue = new Set();
+    }
+    forbiddenInsertionIndicesCache.set(containerEl, newValue);
+    return newValue;
+}
 
 const scrollActivationMargin = 60; // In pixels. TODO: Allow adjusting with element markup.
 
