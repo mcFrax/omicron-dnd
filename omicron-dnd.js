@@ -31,6 +31,9 @@ let yEndNoMoveZone = 0;   // and yEndNoMoveZone nothing will happen.
 let animFrameRequestId = 0; // 0 is never used as actual id.
 let yDirection = -1;
 let preDragTimeoutId = 0;
+let scrollers = [];
+let activeScrollers = [];
+let lastScrollAnimationTimestamp = null;
 
 let anims = [];
 let animsByElem = new Map();
@@ -206,6 +209,8 @@ function startDrag() {
     unsetEvents_statePreDrag();
     setEvents_stateDrag();
 
+    scrollers = collectScrollers(toEl);
+
     // Prevent the scroll-to-refresh behavior and the effect
     // of bumping into the scroll end on mobile.
     // TODO: call it only after the delay.
@@ -287,10 +292,6 @@ function stateDrag_window_TouchDown(event) {
 function stateDrag_window_TouchMove(event) {
     // Prevent scroll.
     event.preventDefault();
-
-    // Once .preventDefault() was called, we don't need this callback any more,
-    // so let's unsubscribe and save some precious mobile resources.
-    window.removeEventListener('pointermove', stateDrag_window_TouchMove, {passive: false});
 }
 function stateDrag_window_PointerMove(event) {
     if (event.pointerId !== pointerId) {
@@ -300,10 +301,11 @@ function stateDrag_window_PointerMove(event) {
     handleMove(event);
 }
 
+// This is to be called only when the pointer actually moves.
 function handleMove(evtPoint) {
     // Update the mouse position.
     if (evtPoint.clientY !== yLast) {
-        yDirection = event.clientY > yLast ? 1 : -1;
+        yDirection = evtPoint.clientY > yLast ? 1 : -1;
     }
     xLast = evtPoint.clientX;
     yLast = evtPoint.clientY;
@@ -315,6 +317,12 @@ function handleMove(evtPoint) {
         animFrameRequestId = requestAnimationFrame(animationFrame);
     }
 
+    updateOnMove(evtPoint);
+}
+
+// This is to be called both when pointer moves, and to invoke synthetic update
+// after scroll.
+function updateOnMove(evtPoint) {
     if (hoverContainersByDepth[0] && hoverContainersByDepth[0].el !== toEl) {
         // TODO: Make it a loop and allow stacking this behavior instead
         // of limiting it to the deepest level.
@@ -329,6 +337,8 @@ function handleMove(evtPoint) {
         return;
     }
 
+    updateActiveScrollers();
+
     let updatedNewIndex = findUpdatedNewIndex(evtPoint);
 
     if (updatedNewIndex != newIndex) {
@@ -340,12 +350,57 @@ function handleMove(evtPoint) {
     }
 }
 
+function updateActiveScrollers() {
+    // TODO: Remove array allocation?
+    activeScrollers = [];
+    for (let i = 0; i < scrollers.length; ++i) {
+        for (let triggerZone of scrollers[i].triggerZones) {
+            if (xLast >= triggerZone.rect.left &&
+                    xLast <= triggerZone.rect.right &&
+                    yLast >= triggerZone.rect.top &&
+                    yLast <= triggerZone.rect.bottom) {
+                activeScrollers.push({
+                    scrollerIndex: i,
+                    scrollerEl: scrollers[i].el,
+                    horizontal: triggerZone.horizontal,
+                    vertical: triggerZone.vertical,
+                    speedInput: computeScrollerSpeedInput(triggerZone),
+                });
+            }
+        }
+    }
+    if (activeScrollers.length === 0) {
+        // Not animating (any more). Let the next animation know that it needs
+        // to count itself in, in case we didn't request previous frames.
+        lastScrollAnimationTimestamp = null;
+    } else {
+        // Request animation for the active scrollers.
+        if (!animFrameRequestId) {
+            animFrameRequestId = requestAnimationFrame(animationFrame);
+        }
+    }
+}
+
+function computeScrollerSpeedInput(triggerZone) {
+    let rect = triggerZone.rect;
+    if (triggerZone.horizontal) {
+        let rateFromLeft = (xLast - rect.left) / (rect.right - rect.left);
+        return (triggerZone.horizontal === 1) ? rateFromLeft : 1 - rateFromLeft;
+    } else {
+        let rateFromTop = (yLast - rect.top) / (rect.bottom - rect.top);
+        return (triggerZone.vertical === 1) ? rateFromTop : 1 - rateFromTop;
+    }
+}
+
 // By default, we optimize the search by going only from the current index
 // in the direction of mouseY, and only when the move is outside of
 // precomputed zone where we know no move happened. When ignoreCurrentNewIndex
 // is true, we ignore both optimization, which is useful for computing
 // the index in a new container.
 function findUpdatedNewIndex(evtPoint, ignoreCurrentNewIndex) {
+    // TODO: There is some glitch in how mouseY works after autoscroll.
+    // I don't know what the issue is, but there is some shift introduced,
+    // perhaps at this place.
     let mouseY = evtPoint.clientY - toEl.getClientRects()[0].top;
 
     let updatedNewIndex = newIndex;
@@ -604,8 +659,8 @@ function exitDrag(execSort) {
     unsetEvents_stateDrag();
 
     // Revert the original overscroll behavior.
-    document.documentElement.style.ovescrollBehavior = htmlOvescrollBehavior;
-    document.body.style.ovescrollBehavior = bodyOvescrollBehavior;
+    document.documentElement.style.overscrollBehavior = htmlOvescrollBehavior;
+    document.body.style.overscrollBehavior = bodyOvescrollBehavior;
 
     pointerId = null;
     activeEl = null;
@@ -615,6 +670,7 @@ function exitDrag(execSort) {
     placeholderEl = null;
     oldIndex = newIndex = 0;
     yDirection = -1;
+    scrollers = [];
 }
 
 function anyState_container_PointerEnter(event) {
@@ -676,6 +732,8 @@ function enterContainer(newToEl, evPlace) {
     // Then handle insertion into the new container.
     toEl = newToEl;
 
+    scrollers = collectScrollers(toEl);
+
     createPlaceholder();
 
     newIndex = findUpdatedNewIndex(evPlace, /*ignoreCurrentNewIndex=*/true);
@@ -693,6 +751,10 @@ function leaveContainer() {
     toEl = null;
 }
 
+const minScrollSpeed = 0.3; // In pixels per millisecond.
+const maxScrollSpeed = 0.7; // In pixels per millisecond.
+const maxScrollSpeedIncrease = maxScrollSpeed - minScrollSpeed;
+
 function animationFrame(timestamp) {
     animFrameRequestId = 0;  // Allow scheduling for the next frame.
     if (floatEl) {
@@ -700,6 +762,28 @@ function animationFrame(timestamp) {
         floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px)`;
     }
     let needsNextFrame = false;
+    if (activeScrollers.length !== 0) {
+        needsNextFrame = true;
+        if (lastScrollAnimationTimestamp) {
+            let frameTime = timestamp - lastScrollAnimationTimestamp;
+            // Animate. If lastScrollAnimationTimestamp is not set, the animation
+            // will start on the next frame.
+            for (let s of activeScrollers) {
+                let scrollSpeed = minScrollSpeed + s.speedInput * maxScrollSpeedIncrease;
+                if (s.vertical) {
+                    const diff = s.vertical * scrollSpeed * frameTime;
+                    s.scrollerEl.scrollTop += diff;
+                    updateScrollerRects(s.i + 1, diff, 0);
+                }
+                if (s.horizontal) {
+                    const diff = s.horizontal * scrollSpeed * frameTime;
+                    s.scrollerEl.scrollLeft += diff;
+                    updateScrollerRects(s.i + 1, 0, diff);
+                }
+            }
+        }
+        lastScrollAnimationTimestamp = timestamp;
+    }
     // Iterate backwards to allow simple removal.
     for (let i = anims.length - 1; i >= 0; --i) {
         if (anims[i].animationFrame(timestamp)) {
@@ -710,6 +794,18 @@ function animationFrame(timestamp) {
     }
     if (needsNextFrame) {
         animFrameRequestId = requestAnimationFrame(animationFrame);
+    }
+}
+
+function updateScrollerRects(firstIndexToUpdate, vDiff, hDiff) {
+    for (let i = firstIndexToUpdate; i < scrollers.length; ++i) {
+        for (let triggerZone of scrollers[i].triggerZones) {
+            let rect = triggerZone.rect;
+            rect.top -= vDiff;
+            rect.bottom -= vDiff;
+            rect.left -= hDiff;
+            rect.right -= hDiff;
+        }
     }
 }
 
@@ -800,6 +896,75 @@ function createFloatEl() {
 }
 
 // Utils.
+
+const scrollActivationMargin = 80; // In pixels. TODO: Allow adjusting with element markup.
+
+function collectScrollers(elem) {
+    let result = [];
+    // TODO: Include document.scrollingElement
+    for (; elem; elem = elem.parentElement) {
+        let style = getComputedStyle(elem);
+        let horizontalScroll =
+            style.overflowX === 'auto' || style.overflowX === 'scroll';
+        let verticalScroll =
+            style.overflowY === 'auto' || style.overflowY === 'scroll';
+        if (!horizontalScroll && !verticalScroll) {
+            continue;
+        }
+        let rect = elem.getClientRects()[0];
+        let triggerZones = [];
+        if (horizontalScroll) {
+            triggerZones.push({
+                rect: {
+                    left: rect.left,
+                    top: rect.top,
+                    right: rect.left + scrollActivationMargin,
+                    bottom: rect.bottom,
+                },
+                horizontal: -1, // scrolling left, i.e. scrollLeft decreasing
+                vertical: null,
+            }, {
+                rect: {
+                    left: rect.right - scrollActivationMargin,
+                    top: rect.top,
+                    right: rect.right,
+                    bottom: rect.bottom,
+                },
+                horizontal: 1, // scrolling right, i.e. scrollLeft increasing
+                vertical: null,
+            });
+        }
+        if (verticalScroll) {
+            triggerZones.push({
+                rect: {
+                    left: rect.left,
+                    top: rect.top,
+                    right: rect.right,
+                    bottom: rect.top + 40,
+                },
+                horizontal: null,
+                vertical: -1, // scrolling up, i.e. scrollTop decreasing
+            }, {
+                rect: {
+                    left: rect.left,
+                    top: rect.bottom - 40,
+                    right: rect.right,
+                    bottom: rect.bottom,
+                },
+                horizontal: null,
+                vertical: 1, // scrolling down, i.e. scrollTop increasing
+            });
+        }
+        result.push({
+            el: elem,
+            horizontalScroll,
+            verticalScroll,
+            triggerZones,
+        });
+    }
+    return result;
+
+}
 
 // Compare function for hoverContainersByDepth.
 function cmpDomDepth(a, b) {
