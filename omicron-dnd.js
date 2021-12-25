@@ -65,6 +65,53 @@ const defaultOptions = {
     // forbiddenInsertionIndicesFn will be called once per container during
     // each drag, and the result will be cached.
     forbiddenInsertionIndicesFn: null,
+    // createFloatElemFn: null,
+
+    // onBeforePreDrag: Called just before preDrag starts.
+    // Return explicit `false` to cancel the drag.
+    // onBeforePreDrag(containerEl, activeEl, event)
+    onBeforePreDrag: null,
+
+    // The element was chosen and the wait starts for the delay or minimal mouse
+    // move to start dragging. The return value is ignored.
+    // onPreDragStart(containerEl, activeEl, event)
+    onPreDragStart: null,
+
+    // Called just after the conditions for the drag start are met, but before
+    // any styling (transforms) for the drag started, before placeholder
+    // and floatEl are created. The return value is ignored.
+    // onBeforeDragStart(containerEl, activeEl)
+    onBeforeDragStart: null,
+
+    // The floatEl to be placed under the pointer was created. You can edit its
+    // internal DOM structure.
+    // onFloatElementCreated(floatEl, containerEl, activeEl)
+    onFloatElementCreated: null,
+
+    // The element is actually being dragged now. The return value is ignored.
+    // onDragStart(containerEl, activeEl)
+    onDragStart: null,
+
+    // The same event format is shared between onInternalChange,
+    // onDropToOtherContainer, onDropFromOtherContainer.
+
+    // Called on change where toEl === fromEl.
+    // onInternalChange(dragEndEvent)
+    onInternalChange: null,
+
+    // Called on fromEl when toEl !== fromEl.
+    // onDropToOtherContainer(dragEndEvent)
+    onDropToOtherContainer: null,
+
+    // Called on toEl when toEl !== fromEl.
+    // onDropFromOtherContainer(dragEndEvent)
+    onDropFromOtherContainer: null,
+
+    // The drag or pre-drag was finished. In case it was a sucessful drag,
+    // called after relevant onInternalChange/onDrop callback, with the same
+    // event.
+    // onDragFinished(dragEndEvent)
+    onDragFinished: null,
 };
 
 function initDragContainer(containerEl, options) {
@@ -171,10 +218,19 @@ function anyState_container_PointerDown(event) {
 // Returns true if preDrag actually started.
 function startPreDrag(event, evPlace) {
     let containerData = event.currentTarget.omicronDragAndDropData;
+    let containerOptions = containerData.options;
     activeEl = getItemFromContainerEvent(event, containerData.options);
     if (!activeEl) {
         // TODO: Add an option to .stopPropagation() here as well, to prevent
         // dragging the container by elements, event if not by the handle?
+        return false;
+    }
+    // Allow the callback to cancel the preDrag before it starts.
+    // This can be used to implement some dynamic barrier on top of
+    // draggableSelector, filterSelector, and handleSelector.
+    if (typeof containerOptions.onBeforePreDrag === 'function' &&
+            containerOptions.onBeforePreDrag(containerData.el, activeEl, event) === false) {
+        activeEl = null;
         return false;
     }
 
@@ -205,6 +261,10 @@ function startPreDrag(event, evPlace) {
     // the mouse moves sufficiently far. We will cancel the drag if the touch
     // moves too far before the delay.
     preDragTimeoutId = setTimeout(startDrag, delay);
+
+    if (typeof containerOptions.onPreDragStart === 'function') {
+        containerOptions.onPreDragStart(fromEl, activeEl, event);
+    }
     return true;
 }
 
@@ -212,6 +272,11 @@ function startDrag() {
     if (preDragTimeoutId) {
         clearTimeout(preDragTimeoutId);
         preDragTimeoutId = 0;
+    }
+    let containerData = fromEl.omicronDragAndDropData;
+    let containerOptions = containerData.options;
+    if (typeof containerOptions.onBeforeDragStart === 'function') {
+        containerOptions.onBeforeDragStart(fromEl, activeEl);
     }
 
     unsetEvents_statePreDrag();
@@ -250,6 +315,10 @@ function startDrag() {
 
     createFloatEl();
 
+    if (typeof containerOptions.onFloatElementCreated === 'function') {
+        containerOptions.onFloatElementCreated(floatEl, fromEl, activeEl);
+    }
+
     styleActiveEl();
 
     yStartNoMoveZone = activeEl.offsetTop - 8;
@@ -264,6 +333,10 @@ function startDrag() {
     // Use getItemsInContainerCount() to skip placeholder at the end.
     let itemsAfter = childrenArray.slice(oldIndex + 1, getItemsInContainerCount(fromEl));
     Anim.start(fromEl, itemsAfter, activeToPlaceholderOffset, animMs);
+
+    if (typeof containerOptions.onDragStart === 'function') {
+        containerOptions.onDragStart(fromEl, activeEl);
+    }
 }
 function statePreDrag_window_TouchMove(event) {
     // empty, statePreDrag_window_PointerMove does the work
@@ -609,6 +682,15 @@ function exitDrag(execSort) {
         preDragTimeoutId = 0;
     }
 
+    let dragEndEvent = {
+        dragExecuted: execSort,
+        item: activeEl,
+        from: fromEl,
+        to: execSort ? toEl : null,
+        oldIndex,
+        newIndex: execSort ? newIndex : null,
+    };
+
     if (execSort && (newIndex !== oldIndex || toEl !== fromEl)) {
         // Note:
         // We need to adjust the position of elements with transform
@@ -684,6 +766,31 @@ function exitDrag(execSort) {
     scrollers = [];
     activeScrollers = [];
     forbiddenInsertionIndicesCache = new Map();
+
+
+    // Finally, let call all the drag-end events.
+    // All the callbacks get the same event object.
+    let fromContainerOptions = dragEndEvent.from.omicronDragAndDropData.options;
+
+    if (execSort) {
+        if (dragEndEvent.to === dragEndEvent.from) {
+            if (typeof fromContainerOptions.onInternalChange === 'function') {
+                fromContainerOptions.onInternalChange(dragEndEvent);
+            }
+        } else {
+            if (typeof fromContainerOptions.onDropToOtherContainer === 'function') {
+                fromContainerOptions.onDropToOtherContainer(dragEndEvent);
+            }
+            let toContainerOptions = dragEndEvent.to.omicronDragAndDropData.options;
+            if (typeof toContainerOptions.onDropFromOtherContainer === 'function') {
+                toContainerOptions.onDropFromOtherContainer(dragEndEvent);
+            }
+        }
+    }
+
+    if (typeof fromContainerOptions.onDragFinished === 'function') {
+        fromContainerOptions.onDragFinished(dragEndEvent);
+    }
 }
 
 function anyState_container_PointerEnter(event) {

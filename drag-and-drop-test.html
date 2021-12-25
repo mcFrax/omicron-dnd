@@ -187,7 +187,35 @@
             if (containerEl.classList.contains('nested')) {
                 OmicronDnd.init(containerEl, {enterGuardLeft: 0.4});
             } else {
-                OmicronDnd.init(containerEl);
+                OmicronDnd.init(containerEl, {
+                    onBeforePreDrag(containerEl, activeEl, event) {
+                        console.log('onBeforePreDrag', containerEl, activeEl, event);
+                    },
+                    onPreDragStart(containerEl, activeEl, event) {
+                        console.log('onPreDragStart', containerEl, activeEl, event);
+                    },
+                    onBeforeDragStart(containerEl, activeEl) {
+                        console.log('onBeforeDragStart', containerEl, activeEl);
+                    },
+                    onFloatElementCreated(floatEl, containerEl, activeEl) {
+                        console.log('onFloatElementCreated', floatEl, containerEl, activeEl);
+                    },
+                    onDragStart(containerEl, activeEl) {
+                        console.log('onDragStart', containerEl, activeEl);
+                    },
+                    onInternalChange(event) {
+                        console.log('onInternalChange', event);
+                    },
+                    onDropToOtherContainer(event) {
+                        console.log('onDropToOtherContainer', event);
+                    },
+                    onDropFromOtherContainer(event) {
+                        console.log('onDropFromOtherContainer', event);
+                    },
+                    onDragFinished(event) {
+                        console.log('onDragFinished', event);
+                    },
+                });
             }
         }
     </script>
