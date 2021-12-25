@@ -508,6 +508,9 @@ function findUpdatedNewIndex(evtPoint, insertionContainer) {
                 // value is going to be 0 anyway.
                 offsetCorrection = 0;
             }
+            if (getComputedStyle(otherEl).display === 'none') {
+                continue;
+            }
             let otherTop = otherEl.offsetTop + offsetCorrection;
             let otherHeight = otherEl.offsetHeight;
             if (mouseY > otherTop + bottomSnapBorder * otherHeight) {
@@ -534,6 +537,9 @@ function findUpdatedNewIndex(evtPoint, insertionContainer) {
             if (otherEl === activeEl) continue;  // May still happen.
             if (i > oldIndex && containerEl === fromEl) {
                 offsetCorrection = activeToPlaceholderOffset;
+            }
+            if (getComputedStyle(otherEl).display === 'none') {
+                continue;
             }
             let otherTop = otherEl.offsetTop + offsetCorrection;
             let otherHeight = otherEl.offsetHeight;
