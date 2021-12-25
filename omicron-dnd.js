@@ -96,6 +96,11 @@ const defaultOptions = {
     // onContainerEntered(containerEl, activeEl)
     onContainerEntered: null,
 
+    // The container is no longer toEl. This will fire at the end of
+    // the drag, too, before the drag finish events.
+    // onContainerLeft(containerEl, activeEl)
+    onContainerLeft: null,
+
     // The same event format is shared between onInternalChange,
     // onDropToOtherContainer, onDropFromOtherContainer.
 
@@ -222,7 +227,7 @@ function anyState_container_PointerDown(event) {
 // Returns true if preDrag actually started.
 function startPreDrag(event, evPlace) {
     let containerData = event.currentTarget.omicronDragAndDropData;
-    let containerOptions = containerData.options;
+    const containerOptions = containerData.options;
     activeEl = getItemFromContainerEvent(event, containerData.options);
     if (!activeEl) {
         // TODO: Add an option to .stopPropagation() here as well, to prevent
@@ -277,7 +282,7 @@ function startDrag() {
         preDragTimeoutId = 0;
     }
     let containerData = fromEl.omicronDragAndDropData;
-    let containerOptions = containerData.options;
+    const containerOptions = containerData.options;
     if (typeof containerOptions.onBeforeDragStart === 'function') {
         containerOptions.onBeforeDragStart(fromEl, activeEl);
     }
@@ -778,6 +783,15 @@ function exitDrag(execSort) {
 
     removeBottomPaddingCorrection();
 
+    if (toEl) {
+        // Invoke onContainerLeft here to be consistent with how it's called
+        // in leaveContainer - after the container cleanup.
+        const toContainerOptions = toEl.omicronDragAndDropData.options;
+        if (typeof toContainerOptions.onContainerLeft === 'function') {
+            toContainerOptions.onContainerLeft(toEl, activeEl);
+        }
+    }
+
     unsetEvents_statePreDrag();
     unsetEvents_stateDrag();
 
@@ -800,7 +814,7 @@ function exitDrag(execSort) {
 
     // Finally, let call all the drag-end events.
     // All the callbacks get the same event object.
-    let fromContainerOptions = dragEndEvent.from.omicronDragAndDropData.options;
+    const fromContainerOptions = dragEndEvent.from.omicronDragAndDropData.options;
 
     if (execSort) {
         if (dragEndEvent.to === dragEndEvent.from) {
@@ -811,7 +825,7 @@ function exitDrag(execSort) {
             if (typeof fromContainerOptions.onDropToOtherContainer === 'function') {
                 fromContainerOptions.onDropToOtherContainer(dragEndEvent);
             }
-            let toContainerOptions = dragEndEvent.to.omicronDragAndDropData.options;
+            const toContainerOptions = dragEndEvent.to.omicronDragAndDropData.options;
             if (typeof toContainerOptions.onDropFromOtherContainer === 'function') {
                 toContainerOptions.onDropFromOtherContainer(dragEndEvent);
             }
@@ -900,7 +914,7 @@ function enterContainer(newToEl, insertionIndex) {
     setPlaceholderAndNoMoveZone();
     activatePlaceholder();
 
-    let containerOptions = toEl.omicronDragAndDropData.options;
+    const containerOptions = toEl.omicronDragAndDropData.options;
     if (typeof containerOptions.onContainerEntered === 'function') {
         containerOptions.onContainerEntered(fromEl, activeEl);
     }
@@ -913,7 +927,14 @@ function leaveContainer() {
 
     removeBottomPaddingCorrection();
 
+    const leftContainerEl = toEl;
+
     toEl = null;
+
+    const containerOptions = leftContainerEl.omicronDragAndDropData.options;
+    if (typeof containerOptions.onContainerLeft === 'function') {
+        containerOptions.onContainerLeft(leftContainerEl, activeEl, void 0);
+    }
 }
 
 const minScrollSpeed = 0.3; // In pixels per millisecond.
