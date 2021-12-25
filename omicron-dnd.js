@@ -91,6 +91,11 @@ const defaultOptions = {
     // onDragStart(containerEl, activeEl)
     onDragStart: null,
 
+    // The container became toEl. This will fire right after onDragStart
+    // for the fromEl (being also toEl) and then for every entered container.
+    // onContainerEntered(containerEl, activeEl)
+    onContainerEntered: null,
+
     // The same event format is shared between onInternalChange,
     // onDropToOtherContainer, onDropFromOtherContainer.
 
@@ -334,6 +339,9 @@ function startDrag() {
 
     if (typeof containerOptions.onDragStart === 'function') {
         containerOptions.onDragStart(fromEl, activeEl);
+    }
+    if (typeof containerOptions.onContainerEntered === 'function') {
+        containerOptions.onContainerEntered(fromEl, activeEl);
     }
 }
 function statePreDrag_window_TouchMove(event) {
@@ -664,11 +672,29 @@ function stateDrag_window_PointerUp(event) {
     if (event.pointerId !== pointerId) {
         return;
     }
+
+    // We can't really prevent the browser for generating a click, but we
+    // can capture it.
+    window.addEventListener('click', preventNextClick, true);
+    // The click will, however, not necessaily generate (only when there
+    // was an element that browser thinks was clicked), so let's make sure
+    // the blocker is removed.
+    setTimeout(removeClickBlocker, 0);
+
     // End drag successfully, except when we aren't actually in any container.
     // TODO: Should we have a special handling for touchcancel? OTOH, I don't
     // see it showing up in practice. Maybe except when touch becomes a scroll,
     // but we eliminate that instance.
     exitDrag(toEl !== null);
+}
+
+function preventNextClick(event) {
+    event.stopPropagation();
+    event.preventDefault();
+    window.removeEventListener('click', preventNextClick, true);
+}
+function removeClickBlocker() {
+    window.removeEventListener('click', preventNextClick, true);
 }
 
 function exitDrag(execSort) {
@@ -839,6 +865,9 @@ function anyState_container_PointerLeave(event) {
 function maybeEnterContainer(containerData, evPlace) {
     let cData = containerData;
     let rect = cData.el.getClientRects()[0];
+    if (!rect) {
+        return false;
+    }
     if (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
             xLast <= rect.right - rect.width * cData.options.enterGuardRight - cData.options.enterGuardRightPx) {
         let insertionIndex = findUpdatedNewIndex(evPlace, cData.el);
@@ -870,6 +899,11 @@ function enterContainer(newToEl, insertionIndex) {
 
     setPlaceholderAndNoMoveZone();
     activatePlaceholder();
+
+    let containerOptions = toEl.omicronDragAndDropData.options;
+    if (typeof containerOptions.onContainerEntered === 'function') {
+        containerOptions.onContainerEntered(fromEl, activeEl);
+    }
 }
 
 function leaveContainer() {

@@ -79,6 +79,15 @@
             background: darkgray;
             color: whitesmoke;
         }
+        .click-popup {
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            border: 1px solid black;
+            background: lightgray;
+        }
         #modules-warning {
             display: none;
             position: fixed;
@@ -180,6 +189,16 @@
             }
         }
 
+        function deferredItemClickHandler(event) {
+            if (event.target.classList.contains('card')) {
+                let clickPopup = document.createElement('div');
+                clickPopup.classList.add('click-popup');
+                clickPopup.textContent = 'Click!';
+                event.target.appendChild(clickPopup);
+                setTimeout(() => { clickPopup.remove(); }, 600);
+            }
+        }
+
         // Init.
         $('#add-green-button').addEventListener('click', addGreenItemsButtonClick);
         addGreenItems(4);
@@ -222,6 +241,7 @@
                     },
                 });
             }
+            containerEl.addEventListener('click', deferredItemClickHandler);
         }
     </script>
     <script>
