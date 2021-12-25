@@ -339,7 +339,7 @@ function startDrag() {
     let childrenArray = Array.from(fromEl.children);
     newIndex = oldIndex = childrenArray.indexOf(activeEl);
     // Use getItemsInContainerCount() to skip placeholder at the end.
-    let itemsAfter = childrenArray.slice(oldIndex + 1, getItemsInContainerCount(fromEl));
+    let itemsAfter = childrenArray.slice(oldIndex + 1, getItemsInContainerEnd(fromEl));
     Anim.start(fromEl, itemsAfter, activeToPlaceholderOffset, animMs);
 
     if (typeof containerOptions.onDragStart === 'function') {
@@ -506,19 +506,20 @@ function findUpdatedNewIndex(evtPoint, insertionContainer) {
     let wiggleZoneSize = 0.5;
     let snapMargin = (1 - wiggleZoneSize) / 2;
     let bottomSnapBorder = yDirection === -1 ? (1 - snapMargin) : snapMargin;
-    let itemsInContainer = getItemsInContainerCount(containerEl);
+    let startIndex = getItemsInContainerStart(containerEl);
+    let endIndex = getItemsInContainerEnd(containerEl);
     if (ignoreCurrentNewIndex || mouseY < yStartNoMoveZone && newIndex !== 0) {
         // Correct for the fact that if we dragged the element down from
         // its place, some elements above it are shifted from their
         // offset position.
         let offsetCorrection = containerEl === fromEl ? activeToNothingOffset : 0;
-        updatedNewIndex = 0;
+        updatedNewIndex = startIndex;
         // We may look up one extra element at the start, but that is not an issue.
-        let iterationStart = itemsInContainer - 1;
+        let iterationStart = endIndex - 1;
         if (!ignoreCurrentNewIndex && newIndex < iterationStart) {
-            iterationStart
+            iterationStart = newIndex;
         }
-        for (let i = iterationStart; i >= 0; --i) {
+        for (let i = iterationStart; i >= startIndex; --i) {
             let otherEl = containerEl.children[i];
             if (otherEl === activeEl) continue;
             if (i < oldIndex) {
@@ -548,9 +549,9 @@ function findUpdatedNewIndex(evtPoint, insertionContainer) {
         let offsetCorrection = nothingToPlaceholderOffset;
         // Set to the highest possible value - in case we are at the very
         // bottom of the container.
-        updatedNewIndex = (containerEl === fromEl) ? itemsInContainer - 1 : itemsInContainer;
+        updatedNewIndex = (containerEl === fromEl) ? endIndex - 1 : endIndex;
         // We may look up one extra element at the start, but that is not an issue.
-        for (let i = newIndex; i < itemsInContainer; ++i) {
+        for (let i = newIndex; i < endIndex; ++i) {
             let otherEl = containerEl.children[i];
             if (otherEl === activeEl) continue;  // May still happen.
             if (i > oldIndex && containerEl === fromEl) {
@@ -587,22 +588,23 @@ function setPlaceholderAndNoMoveZone() {
 }
 
 function findPlaceholderTop() {
-    let itemsInContainer = getItemsInContainerCount(toEl);
+    let startIndex = getItemsInContainerStart(toEl);
+    let endIndex = getItemsInContainerEnd(toEl);
     let ref, offsetCorrection;
-    if (itemsInContainer === 0) {
+    if (endIndex === startIndex) {
         // We don't have any reference, it will just be at the top.
         // However, the offsetCorrection should probably account for
         // margin/padding.
         ref = null;
         offsetCorrection = 0;
-    } else if (toEl === fromEl && newIndex === itemsInContainer - 1) {
+    } else if (toEl === fromEl && newIndex === endIndex - 1) {
         // Last element in fromEl.
-        ref = toEl.children[itemsInContainer-1];
+        ref = toEl.children[endIndex-1];
         // Position the placeholder _after_ the ref.
         offsetCorrection = ref.offsetHeight + 8 + activeToNothingOffset;
-    } else if (toEl !== fromEl && newIndex === itemsInContainer) {
+    } else if (toEl !== fromEl && newIndex === endIndex) {
         // Last element, not in fromEl.
-        ref = toEl.children[itemsInContainer-1];
+        ref = toEl.children[endIndex-1];
         // Position the placeholder _after_ the ref.
         offsetCorrection = ref.offsetHeight + 8;
     } else if (toEl === fromEl && newIndex > oldIndex) {
@@ -644,7 +646,7 @@ function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
     let newIndex = 'DEATH AND DESTRUCTION!';
 
     let inFromEl = (fromEl === containerEl);
-    let maxItemIndex = getItemsInContainerCount(containerEl) - 1;
+    let maxItemIndex = getItemsInContainerEnd(containerEl) - 1;
     let affectedStart =
         Math.min(maxItemIndex, Math.min(newNewIndex, previousIndex));
     let affectedEnd =
@@ -914,7 +916,7 @@ function enterContainer(newToEl, insertionIndex) {
     addBottomPaddingCorrection();
 
     newIndex = insertionIndex;
-    animateMoveInsideContainer(toEl, getItemsInContainerCount(toEl), newIndex);
+    animateMoveInsideContainer(toEl, getItemsInContainerEnd(toEl), newIndex);
 
     setPlaceholderAndNoMoveZone();
     activatePlaceholder();
@@ -928,7 +930,7 @@ function enterContainer(newToEl, insertionIndex) {
 function leaveContainer() {
     deactivatePlaceholder();
 
-    animateMoveInsideContainer(toEl, newIndex, getItemsInContainerCount(toEl));
+    animateMoveInsideContainer(toEl, newIndex, getItemsInContainerEnd(toEl));
 
     removeBottomPaddingCorrection();
 
@@ -1222,20 +1224,34 @@ function getDomDepth(elem) {
     return result;
 }
 
-function getItemsInContainerCount(containerEl) {
-    let lastIndex = containerEl.children.length - 1;
-    let lastItemCandidate = containerEl.lastElementChild;
-    if (!lastItemCandidate) {
-        return 0;
+// Get the first index for items that we consider for drag and drop
+// end positioning. Skip anything with display: none.
+function getItemsInContainerStart(containerEl) {
+    for (let i = 0; i < containerEl.children.length; ++i) {
+        if (getComputedStyle(containerEl.children[i]).display !== 'none') {
+            return i;
+        }
     }
-    while (
-        lastItemCandidate && (
-            lastItemCandidate === floatEl ||
-            lastItemCandidate === placeholderEl)) {
-        lastItemCandidate = lastItemCandidate.previousElementSibling;
-        --lastIndex;
+    // Nothing was found. That means that getItemsInContainerEnd() will also
+    // find nothing and return 0, so let's return 0 for start/end consistency.
+    return 0;
+}
+
+// Get the after-last index for items that we consider for drag and drop
+// end positioning.
+// Skip the temporary Omicron's elements at the end of the container,
+// as well as anything with display: none.
+function getItemsInContainerEnd(containerEl) {
+    for (let i = containerEl.children.length - 1; i >= 0; --i) {
+        const candidate = containerEl.children[i];
+        if (candidate !== floatEl &&
+                candidate !== placeholderEl &&
+                getComputedStyle(candidate).display !== 'none') {
+            // i is the index of last actual element, so the end index is i+1.
+            return i + 1;
+        }
     }
-    return lastIndex + 1;
+    return 0;
 }
 
 // Anim is implemented to hold an array of elems, but we actually rely on it
