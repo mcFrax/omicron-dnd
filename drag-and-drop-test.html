@@ -188,6 +188,11 @@
                 OmicronDnd.init(containerEl, {enterGuardLeft: 0.4});
             } else {
                 OmicronDnd.init(containerEl, {
+                    // forbiddenInsertionIndicesFn(c) {
+                    //     if (c === containerEl) {
+                    //         return [4];
+                    //     }
+                    // },
                     onBeforePreDrag(containerEl, activeEl, event) {
                         console.log('onBeforePreDrag', containerEl, activeEl, event);
                     },

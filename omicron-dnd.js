@@ -51,7 +51,6 @@ const hoverContainersByDepth = [];
 
 // elem => [Number]
 let forbiddenInsertionIndicesCache = new Map();
-let toElForbiddenIndices = null;
 
 const defaultOptions = {
     draggableSelector: null,
@@ -240,7 +239,6 @@ function startPreDrag(event, evPlace) {
     event.stopPropagation();
 
     toEl = fromEl = containerData.el;
-    toElForbiddenIndices = getForbiddenInsertionIndices(toEl);
 
     containerData.domDepth = getDomDepth(fromEl);
     hoverContainers.set(fromEl, containerData); // Make sure the current container is on the list.
@@ -422,7 +420,7 @@ function updateOnMove(evtPoint) {
 
     let updatedNewIndex = findUpdatedNewIndex(evtPoint);
 
-    if (updatedNewIndex != newIndex && !toElForbiddenIndices.has(updatedNewIndex)) {
+    if (updatedNewIndex != newIndex && !isForbiddenIndex(toEl, updatedNewIndex)) {
         let previousIndex = newIndex;
         newIndex = updatedNewIndex;
         animateMoveInsideContainer(toEl, previousIndex, updatedNewIndex);
@@ -837,12 +835,8 @@ function maybeEnterContainer(containerData, evPlace) {
     let rect = cData.el.getClientRects()[0];
     if (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
             xLast <= rect.right - rect.width * cData.options.enterGuardRight - cData.options.enterGuardRightPx) {
-        let forbiddenIndices = getForbiddenInsertionIndices(cData.el);
         let insertionIndex = findUpdatedNewIndex(evPlace, cData.el);
-        if (!forbiddenIndices.has(insertionIndex)) {
-            // Slightly jumping the gun here, as toEl is not yet updated,
-            // but I assume that leaveContainer() won't be looking at that.
-            toElForbiddenIndices = forbiddenIndices;
+        if (!isForbiddenIndex(cData.el, insertionIndex)) {
             enterContainer(cData.el, insertionIndex);
             return true;
         }
@@ -988,7 +982,7 @@ function addBottomPaddingCorrection() {
 }
 
 function removeBottomPaddingCorrection() {
-    if (toEl !== fromEl) {
+    if (toEl !== null && toEl !== fromEl) {
         // Reset extended padding.
         toEl.style.paddingBottom = null;
     }
@@ -1041,6 +1035,25 @@ function createFloatEl() {
 }
 
 // Utils.
+
+// There is a sneaky subtlety in using forbiddenIndices, as for elements
+// in fromEl after oldIndex the newIndex refers not to the object we would
+// inserting before, but instead the one we will be inserting after (i.e.
+// everything is shifted by one index).
+// In order to simplify writing forbiddenInsertionIndicesFns, I make it
+// ignore the shift (i.e. return the same values regardless whether the
+// given container is fromEl or not), and make the correction here instead.
+// The important caveat is that forbiddenIndices set should always be read
+// through this function.
+function isForbiddenIndex(containerEl, index) {
+    // TODO: Optimize for getting forbidden index from toEl? We are almost
+    // always looking at the toEl anyway.
+    let forbiddenIndices = getForbiddenInsertionIndices(containerEl);
+    if (containerEl === fromEl && index > oldIndex) {
+        return forbiddenIndices.has(index + 1);
+    }
+    return forbiddenIndices.has(index);
+}
 
 function getForbiddenInsertionIndices(containerEl) {
     let cachedValue = forbiddenInsertionIndicesCache.get(containerEl);
