@@ -415,10 +415,15 @@ function handleMove(evtPoint) {
 // This is to be called both when pointer moves, and to invoke synthetic update
 // after scroll.
 function updateOnMove(evtPoint) {
-    if (hoverContainersByDepth[0] && hoverContainersByDepth[0].el !== toEl) {
-        // TODO: Make it a loop and allow stacking this behavior instead
-        // of limiting it to the deepest level.
-        if (maybeEnterContainer(hoverContainersByDepth[0], evtPoint)) {
+    // If we are hovering over some containers that are descendants
+    // of toEl but we didn't enter them yet for any reason, let's reconsider.
+    const toElDomDepth = toEl ? toEl.omicronDragAndDropData.domDepth : -1;
+    for (let i = 0; i < hoverContainersByDepth.length; ++i) {
+        if (hoverContainersByDepth[i].domDepth <= toElDomDepth) {
+            // Not looking at toEl or ancestors.
+            break;
+        }
+        if (maybeEnterContainer(hoverContainersByDepth[i], evtPoint)) {
             // enterContainer took take care of handling the new position
             // and animation, so our work here is done.
             return;
