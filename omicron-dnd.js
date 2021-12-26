@@ -84,6 +84,8 @@ const defaultOptions = {
 
     // The floatEl to be placed under the pointer was created. You can edit its
     // internal DOM structure.
+    // Use it to remove or override any "pointer-events: all" rules you might
+    // have created inside the element, as they will break the drag logic.
     // onFloatElementCreated(floatEl, containerEl, activeEl)
     onFloatElementCreated: null,
 
