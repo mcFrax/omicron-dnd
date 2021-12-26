@@ -614,6 +614,13 @@ function findPlaceholderTop() {
         ref = toEl.children[newIndex]
         offsetCorrection = 0;
     }
+    // Correct the ref if we hit an element with display: none.
+    // Thanks to endIndex check we know that the ref is either displayed
+    // itself or there is a displayed object below it, that we will eventually
+    // find..
+    while (ref && getComputedStyle(ref).display === 'none') {
+        ref = ref.nextElementSibling;
+    }
     // This will be the new activeEl's top as well, once we move it.
     return ref ? ref.offsetTop + offsetCorrection : offsetCorrection;
 }
