@@ -412,6 +412,11 @@ function stateDrag_window_TouchDown(event) {
     exitDrag(false);
 }
 function stateDrag_window_TouchMove(event) {
+    if (!event.cancelable) {
+        // The browser screwed us and we can't prevent the scroll.
+        exitDrag(false);
+        return;
+    }
     // Prevent scroll.
     event.preventDefault();
 
