@@ -43,12 +43,6 @@ let transformsByElem = new Map();
 const minimalMoveMouse = 5;
 const delay = 220;
 
-// containerEl => containerData
-const hoverContainers = new Map();
-// containerData from containers under mouse.
-// Sorted from the deepest to most shallow (i.e. max to min).
-const hoverContainersByDepth = [];
-
 // elem => [Number]
 let forbiddenInsertionIndicesCache = new Map();
 
@@ -136,8 +130,6 @@ function initDragContainer(containerEl, options) {
     };
     containerEl.addEventListener('touchdown', anyState_container_TouchDown);
     containerEl.addEventListener('pointerdown', anyState_container_PointerDown);
-    containerEl.addEventListener('pointerenter', anyState_container_PointerEnter);
-    containerEl.addEventListener('pointerleave', anyState_container_PointerLeave);
     containerEl.omicronDragAndDropData = containerData;
 }
 function setEvents_statePreDrag() {
@@ -205,7 +197,6 @@ function anyState_container_PointerDown(event) {
     // we need to release the pointer capture.
     // Source: https://stackoverflow.com/questions/27908339/js-touch-equivalent-for-mouseenter
     event.target.releasePointerCapture(event.pointerId);
-
     if (activeEl !== null || pointerId !== null) {
         return;
     }
@@ -273,12 +264,6 @@ function startPreDrag(event, evPlace) {
 
     toEl = fromEl = containerData.el;
 
-    containerData.domDepth = getDomDepth(fromEl);
-    hoverContainers.set(fromEl, containerData); // Make sure the current container is on the list.
-    if (hoverContainersByDepth.indexOf(containerData) === -1) {
-        hoverContainersByDepth.push(containerData);
-        hoverContainersByDepth.sort(cmpDomDepth);
-    }
     // Should we go over the whole activeEl subtree and mark the containers there
     // as inactive? We may need to, actually.
 
@@ -426,18 +411,18 @@ function stateDrag_window_TouchMove(event) {
         return;
     }
 
-    handleMove(event.touches.item(0));
+    handleMove(event.touches.item(0), event.target);
 }
 function stateDrag_window_PointerMove(event) {
     if (event.pointerId !== pointerId) {
         return;
     }
 
-    handleMove(event);
+    handleMove(event, event.target);
 }
 
 // This is to be called only when the pointer actually moves.
-function handleMove(evtPoint) {
+function handleMove(evtPoint, eventTarget) {
     // Update the mouse position.
     if (evtPoint.clientY !== yLast) {
         yDirection = evtPoint.clientY > yLast ? 1 : -1;
@@ -452,21 +437,48 @@ function handleMove(evtPoint) {
         animFrameRequestId = requestAnimationFrame(animationFrame);
     }
 
-    updateOnMove(evtPoint);
+    updateOnMove(evtPoint, eventTarget);
 }
 
+let lastElemFromPoint = null;
 // This is to be called both when pointer moves, and to invoke synthetic update
 // after scroll.
-function updateOnMove(evtPoint) {
+function updateOnMove(evtPoint, eventTarget) {
+    // Note: document.elementsFromPoint (plural!) would give us more resolution,
+    // but at likely cost of performance. I assume that we can rely on simple
+    // DOM hierarchy to reflect the position containement for the drop zones.
+
+    let toElFound = false;
+    let hoverContainers = [];
+    let el = document.elementFromPoint(evtPoint.clientX, evtPoint.clientY);
+    if (el !== eventTarget) {
+        console.log(el, eventTarget);
+    }
+    if (el !== lastElemFromPoint) {
+        lastElemFromPoint = el;
+    }
+    for (; el !== null; el = el.parentElement) {
+        if (el.omicronDragAndDropData) {
+            hoverContainers.push(el);
+            if (el === toEl) {
+                toElFound = true;
+            }
+        }
+    }
+
+    if (toEl !== null && !toElFound) {
+        leaveContainer();
+    }
+
+    // If we are not in a container, consider entering anything under pointer.
     // If we are hovering over some containers that are descendants
     // of toEl but we didn't enter them yet for any reason, let's reconsider.
-    const toElDomDepth = toEl ? toEl.omicronDragAndDropData.domDepth : -1;
-    for (let i = 0; i < hoverContainersByDepth.length; ++i) {
-        if (hoverContainersByDepth[i].domDepth <= toElDomDepth) {
+    for (const hoverContainer of hoverContainers) {
+        if (hoverContainer === toEl) {
             // Not looking at toEl or ancestors.
             break;
         }
-        if (maybeEnterContainer(hoverContainersByDepth[i], evtPoint)) {
+        if (maybeEnterContainer(hoverContainer.omicronDragAndDropData, evtPoint)) {
             // enterContainer took take care of handling the new position
             // and animation, so our work here is done.
             return;
@@ -905,52 +917,6 @@ function exitDrag(execSort) {
     }
 }
 
-function anyState_container_PointerEnter(event) {
-    let containerData = event.currentTarget.omicronDragAndDropData;
-    containerData.domDepth = getDomDepth(event.currentTarget);
-    hoverContainers.set(event.currentTarget, containerData);
-    if (hoverContainersByDepth.indexOf(containerData) === -1) {
-        hoverContainersByDepth.push(containerData);
-        hoverContainersByDepth.sort(cmpDomDepth);
-    }
-
-    if (!fromEl) {
-        // Not dragging anything, so nothing to do.
-        return;
-    }
-    if (event.currentTarget === toEl) {
-        // Already in this container, nothing to do.
-        return;
-    }
-
-    maybeEnterContainer(containerData, event);
-}
-
-function anyState_container_PointerLeave(event) {
-    let containerData = event.currentTarget.omicronDragAndDropData;
-    hoverContainers.delete(event.currentTarget);
-    let delIdx;
-    if ((delIdx = hoverContainersByDepth.indexOf(containerData)) !== -1) {
-        hoverContainersByDepth.splice(delIdx, 1);
-    }
-
-    if (event.currentTarget !== toEl) {
-        return; // Not relevant.
-    }
-
-    if (event.buttons === 0) {
-        // This PointerLeave event was caused by releasing the touch or
-        // button. Don't call leaveContainer, the subsequent PointerUp
-        // or TouchEnd will handle the end of the drag instead.
-        return;
-    }
-
-    leaveContainer();
-
-    // mousemove handler will figure the container to enter.
-    // TODO: if it gets glitchy, call the mousemove handler here directly.
-}
-
 function maybeEnterContainer(containerData, evPlace) {
     let cData = containerData;
     let rect = cData.el.getClientRects()[0];
@@ -1275,21 +1241,6 @@ function collectScrollers(elem) {
     }
     return result;
 
-}
-
-// Compare function for hoverContainersByDepth.
-function cmpDomDepth(a, b) {
-    return b.domDepth - a.domDepth;
-}
-
-// Get elem's depth in the DOM tree.
-// Note: no special handling for elements not attached to actual document.
-function getDomDepth(elem) {
-    let result = 0;
-    for (elem = elem && elem.parentElement; elem; elem = elem.parentElement) {
-        ++result;
-    }
-    return result;
 }
 
 // Get the first index for items that we consider for drag and drop
