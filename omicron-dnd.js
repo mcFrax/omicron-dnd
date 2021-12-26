@@ -385,8 +385,8 @@ function statePreDrag_window_TouchMove(event) {
 }
 function statePreDrag_window_TouchEndOrCancel(event) {
     exitDrag(false);
-    event.preventDefault();
-    event.stopPropagation();
+    // This is pre-drag and no move happened, so we allow the click,
+    // hence no preventDefault() call here.
 }
 function statePreDrag_window_PointerMove(event) {
     if (event.pointerId !== pointerId) {
