@@ -132,29 +132,33 @@ function initDragContainer(containerEl, options) {
         options: Object.assign({}, defaultOptions, options || {}),
         domDepth: 0, // To be updated dynamically when added to hoverContainers.
     };
+    containerEl.addEventListener('touchdown', anyState_container_TouchDown);
     containerEl.addEventListener('pointerdown', anyState_container_PointerDown);
     containerEl.addEventListener('pointerenter', anyState_container_PointerEnter);
     containerEl.addEventListener('pointerleave', anyState_container_PointerLeave);
     containerEl.omicronDragAndDropData = containerData;
-    // There is no touchenter. :(
-    // TODO: Work it around with pointerevents or mousemove on all containers.
-    // PointerEvents look preferable anyway, unless there is some big caveat,
-    // and seem to have enough support to just assume they are reliable.
 }
 function setEvents_statePreDrag() {
     if (touchDrag) {
-        // Seems like we need to catch the touchmove from the get-go?
-        window.addEventListener('touchmove', statePreDrag_window_TouchMove);
+        window.addEventListener('touchdown', statePreDrag_window_TouchDown);
+        window.addEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
+        window.addEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
+        window.addEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
+    } else {
+        window.addEventListener('pointermove', statePreDrag_window_PointerMove);
+        window.addEventListener('pointerup', statePreDrag_window_PointerUp, true);
     }
-    window.addEventListener('pointermove', statePreDrag_window_PointerMove);
-    window.addEventListener('pointerup', statePreDrag_window_PointerUp, true);
 }
 function unsetEvents_statePreDrag() {
     if (touchDrag) {
-        window.removeEventListener('touchmove', statePreDrag_window_TouchMove);
+        window.removeEventListener('touchdown', statePreDrag_window_TouchDown);
+        window.removeEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
+        window.removeEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
+        window.removeEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
+    } else {
+        window.removeEventListener('pointermove', statePreDrag_window_PointerMove);
+        window.removeEventListener('pointerup', statePreDrag_window_PointerUp, true);
     }
-    window.removeEventListener('pointermove', statePreDrag_window_PointerMove);
-    window.removeEventListener('pointerup', statePreDrag_window_PointerUp, true);
 }
 function setEvents_stateDrag() {
     if (touchDrag) {
@@ -164,19 +168,42 @@ function setEvents_stateDrag() {
         // .preventDefault() on them and stop the scrolling.
         // Calling .preventDefault() on PointerEvents doesn't do that.
         window.addEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
+        window.addEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
+        window.addEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
+    } else {
+        window.addEventListener('pointermove', stateDrag_window_PointerMove);
+        window.addEventListener('pointerup', stateDrag_window_PointerUp, true);
     }
-    window.addEventListener('pointermove', stateDrag_window_PointerMove);
-    window.addEventListener('pointerup', stateDrag_window_PointerUp, true);
 }
 function unsetEvents_stateDrag() {
     if (touchDrag) {
         window.removeEventListener('touchdown', stateDrag_window_TouchDown);
         window.removeEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
+        window.removeEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
+        window.removeEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
+    } else {
+        window.removeEventListener('pointermove', stateDrag_window_PointerMove);
+        window.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
     }
-    window.removeEventListener('pointermove', stateDrag_window_PointerMove);
-    window.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
+}
+function anyState_container_TouchDown(event) {
+    if (activeEl !== null || pointerId !== null) {
+        return;
+    }
+    touchDrag = true;
+    // Note: nothing to do if startPreDrag fails, but it may change at some point.
+    startPreDrag(event, event);
 }
 function anyState_container_PointerDown(event) {
+    // Unconditionally release pointer capture. I do that before any checks
+    // for pending drag to avoid unnecessary races with touchdown.
+
+    // Pointermove events are by default all captured by the pointerdown's target.
+    // That means no pointerenter/pointerleave events, that we rely on, so
+    // we need to release the pointer capture.
+    // Source: https://stackoverflow.com/questions/27908339/js-touch-equivalent-for-mouseenter
+    event.target.releasePointerCapture(event.pointerId);
+
     if (activeEl !== null || pointerId !== null) {
         return;
     }
@@ -187,12 +214,6 @@ function anyState_container_PointerDown(event) {
         return;
     }
     touchDrag = (event.pointerType === 'touch');
-
-    // Pointermove events are by default all captured by the pointerdown's target.
-    // That means no pointerenter/pointerleave events, that we rely on, so
-    // we need to release the pointer capture.
-    // Source: https://stackoverflow.com/questions/27908339/js-touch-equivalent-for-mouseenter
-    event.target.releasePointerCapture(event.pointerId);
 
     if (startPreDrag(event, event)) {
         pointerId = event.pointerId;
@@ -349,17 +370,24 @@ function startDrag() {
         containerOptions.onContainerEntered(fromEl, activeEl);
     }
 }
+function statePreDrag_window_TouchDown(event) {
+    if (event.touches.length !== 1) {
+        // We don't allow multi-touch during drag.
+        exitDrag(false);
+    }
+}
 function statePreDrag_window_TouchMove(event) {
-    // empty, statePreDrag_window_PointerMove does the work
+    // We may not be able to cancel the scroll any more after this event,
+    // so we have to give up the drag.
+    exitDrag(false);
+}
+function statePreDrag_window_TouchEndOrCancel(event) {
+    exitDrag(false);
+    event.preventDefault();
+    event.stopPropagation();
 }
 function statePreDrag_window_PointerMove(event) {
     if (event.pointerId !== pointerId) {
-        return;
-    }
-    if (touchDrag) {
-        // We may not be able to cancel the scroll any more after this event,
-        // so we have to give up the drag.
-        exitDrag(false);
         return;
     }
     xLast = event.clientX;
@@ -384,6 +412,14 @@ function stateDrag_window_TouchDown(event) {
 function stateDrag_window_TouchMove(event) {
     // Prevent scroll.
     event.preventDefault();
+
+    if (event.touches.length !== 1) {
+        // We don't allow multi-touch during dragging.
+        exitDrag(false);
+        return;
+    }
+
+    handleMove(event.touches.item(0));
 }
 function stateDrag_window_PointerMove(event) {
     if (event.pointerId !== pointerId) {
@@ -687,11 +723,22 @@ function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
     }
 }
 
+function stateDrag_window_TouchCancel(event) {
+    exitDrag(false);
+}
+function stateDrag_window_TouchEnd(event) {
+    dragEndedWithRelease();
+    event.preventDefault();
+    event.stopPropagation();
+}
 function stateDrag_window_PointerUp(event) {
     if (event.pointerId !== pointerId) {
         return;
     }
+    dragEndedWithRelease();
+}
 
+function dragEndedWithRelease() {
     // We can't really prevent the browser for generating a click, but we
     // can capture it.
     window.addEventListener('click', preventNextClick, true);
@@ -881,7 +928,14 @@ function anyState_container_PointerLeave(event) {
     }
 
     if (event.currentTarget !== toEl) {
-        return // Not relevant.
+        return; // Not relevant.
+    }
+
+    if (event.buttons === 0) {
+        // This PointerLeave event was caused by releasing the touch or
+        // button. Don't call leaveContainer, the subsequent PointerUp
+        // or TouchEnd will handle the end of the drag instead.
+        return;
     }
 
     leaveContainer();
