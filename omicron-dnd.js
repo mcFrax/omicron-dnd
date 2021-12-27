@@ -147,6 +147,7 @@ function setEvents_statePreDrag() {
         window.addEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
         window.addEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
         window.addEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
+        window.addEventListener('pointermove', cancelIfCancellable, {passive: false});
     } else {
         window.addEventListener('pointermove', statePreDrag_window_PointerMove);
         window.addEventListener('pointerup', statePreDrag_window_PointerUp, true);
@@ -158,6 +159,7 @@ function unsetEvents_statePreDrag() {
         window.removeEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
         window.removeEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
         window.removeEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
+        window.removeEventListener('pointermove', cancelIfCancellable, {passive: false});
     } else {
         window.removeEventListener('pointermove', statePreDrag_window_PointerMove);
         window.removeEventListener('pointerup', statePreDrag_window_PointerUp, true);
@@ -173,6 +175,7 @@ function setEvents_stateDrag() {
         window.addEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
         window.addEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
         window.addEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
+        window.addEventListener('pointermove', cancelIfCancellable, {passive: false});
     } else {
         window.addEventListener('pointermove', stateDrag_window_PointerMove);
         window.addEventListener('pointerup', stateDrag_window_PointerUp, true);
@@ -184,9 +187,15 @@ function unsetEvents_stateDrag() {
         window.removeEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
         window.removeEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
         window.removeEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
+        window.removeEventListener('pointermove', cancelIfCancellable, {passive: false});
     } else {
         window.removeEventListener('pointermove', stateDrag_window_PointerMove);
         window.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
+    }
+}
+function cancelIfCancellable(event) {
+    if (event.cancelable) {
+        event.preventDefault();
     }
 }
 function anyState_container_TouchDown(event) {
@@ -413,13 +422,10 @@ function stateDrag_window_TouchDown(event) {
     exitDrag(false);
 }
 function stateDrag_window_TouchMove(event) {
-    if (!event.cancelable) {
-        // The browser screwed us and we can't prevent the scroll.
-        exitDrag(false);
-        return;
+    if (event.cancelable) {
+        // Prevent scroll.
+        event.preventDefault();
     }
-    // Prevent scroll.
-    event.preventDefault();
 
     if (event.touches.length !== 1) {
         // We don't allow multi-touch during dragging.
