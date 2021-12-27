@@ -32,6 +32,7 @@ let animFrameRequestId = 0; // 0 is never used as actual id.
 let yDirection = -1;
 let preDragTimeoutId = 0;
 let scrollers = [];
+let knownScrollers = new Map();
 let activeScrollers = [];
 let lastScrollAnimationTimestamp = null;
 
@@ -490,22 +491,34 @@ function updateOnMove(evtPoint) {
     }
 }
 
+const scrollActivationMargin = 60; // In pixels. TODO: Allow adjusting with element markup.
+
 function updateActiveScrollers() {
     // TODO: Remove array allocation?
     activeScrollers = [];
-    for (let i = 0; i < scrollers.length; ++i) {
-        for (let triggerZone of scrollers[i].triggerZones) {
-            if (xLast >= triggerZone.rect.left &&
-                    xLast <= triggerZone.rect.right &&
-                    yLast >= triggerZone.rect.top &&
-                    yLast <= triggerZone.rect.bottom) {
-                activeScrollers.push({
-                    scrollerIndex: i,
-                    scrollerEl: scrollers[i].el,
-                    horizontal: triggerZone.horizontal,
-                    vertical: triggerZone.vertical,
-                    speedInput: computeScrollerSpeedInput(triggerZone),
-                });
+    for (let scroller of scrollers) {
+        if (scroller.horizontal) {
+            if (xLast < scroller.rect.left + scrollActivationMargin) {
+                // Scrolling left.
+                activateScroller(scroller, -1, 0,
+                    (scroller.rect.left + scrollActivationMargin - xLast) / scrollActivationMargin);
+            } else if (xLast > scroller.rect.right - scrollActivationMargin) {
+                // Scrolling right.
+                activateScroller(scroller, 1, 0,
+                    (xLast - scroller.rect.right + scrollActivationMargin) / scrollActivationMargin);
+            } else {
+                scroller.snapCooldown = false;
+            }
+        }
+        if (scroller.vertical) {
+            if (yLast < scroller.rect.top + scrollActivationMargin) {
+                // Scrolling up.
+                activateScroller(scroller, 0, -1,
+                    (scroller.rect.top + scrollActivationMargin - yLast) / scrollActivationMargin);
+            } else if (yLast > scroller.rect.bottom - scrollActivationMargin) {
+                // Scrolling down.
+                activateScroller(scroller, 0, 1,
+                    (yLast - scroller.rect.bottom + scrollActivationMargin) / scrollActivationMargin);
             }
         }
     }
@@ -521,14 +534,27 @@ function updateActiveScrollers() {
     }
 }
 
-function computeScrollerSpeedInput(triggerZone) {
-    let rect = triggerZone.rect;
-    if (triggerZone.horizontal) {
-        let rateFromLeft = (xLast - rect.left) / (rect.right - rect.left);
-        return (triggerZone.horizontal === 1) ? rateFromLeft : 1 - rateFromLeft;
+// This is a helper for updateActiveScrollers, only to be called from there.
+function activateScroller(scroller, horizontal, vertical, speedInput) {
+    if (scroller.snap) {
+        if (!scroller.snapCooldown) {
+            if (horizontal) {
+                scroller.el.scrollLeft += horizontal * scroller.el.clientWidth;
+            }
+            if (vertical) {
+                scroller.el.scrollTop += vertical * scroller.el.clientHeight;
+            }
+            scroller.snapCooldown = true; // Prevent immediate re-activation.
+        }
+        // TODO: Either force recomputing the rects for other scrollers after
+        // the scroll, or maybe just give up caching the rects.
     } else {
-        let rateFromTop = (yLast - rect.top) / (rect.bottom - rect.top);
-        return (triggerZone.vertical === 1) ? rateFromTop : 1 - rateFromTop;
+        activeScrollers.push({
+            scrollerEl: scroller.el,
+            horizontal,
+            vertical,
+            speedInput,
+        });
     }
 }
 
@@ -876,6 +902,7 @@ function exitDrag(execSort) {
     oldIndex = newIndex = 0;
     yDirection = -1;
     scrollers = [];
+    knownScrollers = new Map();
     activeScrollers = [];
     forbiddenInsertionIndicesCache = new Map();
 
@@ -1029,17 +1056,18 @@ function animationFrame(timestamp) {
             let frameTime = timestamp - lastScrollAnimationTimestamp;
             // Animate. If lastScrollAnimationTimestamp is not set, the animation
             // will start on the next frame.
-            for (let s of activeScrollers) {
+            for (let i = 0; i < activeScrollers.length; ++i) {
+                let s = activeScrollers[i];
                 let scrollSpeed = minScrollSpeed + s.speedInput * maxScrollSpeedIncrease;
                 if (s.vertical) {
                     const diff = s.vertical * scrollSpeed * frameTime;
                     s.scrollerEl.scrollTop += diff;
-                    updateScrollerRects(s.i + 1, diff, 0);
+                    updateScrollerRects(i, diff, 0);
                 }
                 if (s.horizontal) {
                     const diff = s.horizontal * scrollSpeed * frameTime;
                     s.scrollerEl.scrollLeft += diff;
-                    updateScrollerRects(s.i + 1, 0, diff);
+                    updateScrollerRects(i, 0, diff);
                 }
             }
         }
@@ -1058,15 +1086,13 @@ function animationFrame(timestamp) {
     }
 }
 
-function updateScrollerRects(firstIndexToUpdate, vDiff, hDiff) {
-    for (let i = firstIndexToUpdate; i < scrollers.length; ++i) {
-        for (let triggerZone of scrollers[i].triggerZones) {
-            let rect = triggerZone.rect;
-            rect.top -= vDiff;
-            rect.bottom -= vDiff;
-            rect.left -= hDiff;
-            rect.right -= hDiff;
-        }
+function updateScrollerRects(updateBefore, vDiff, hDiff) {
+    for (let i = 0; i < updateBefore; ++i) {
+        const rect = scrollers[i].rect;
+        rect.top -= vDiff;
+        rect.bottom -= vDiff;
+        rect.left -= hDiff;
+        rect.right -= hDiff;
     }
 }
 
@@ -1208,8 +1234,6 @@ function getForbiddenInsertionIndices(containerEl) {
     return newValue;
 }
 
-const scrollActivationMargin = 60; // In pixels. TODO: Allow adjusting with element markup.
-
 function collectScrollers(elem) {
     let result = [];
     // TODO: Include document.scrollingElement
@@ -1223,58 +1247,23 @@ function collectScrollers(elem) {
             continue;
         }
         let rect = elem.getClientRects()[0];
-        let triggerZones = [];
-        if (horizontalScroll) {
-            triggerZones.push({
-                rect: {
-                    left: rect.left,
-                    top: rect.top,
-                    right: rect.left + scrollActivationMargin,
-                    bottom: rect.bottom,
-                },
-                horizontal: -1, // scrolling left, i.e. scrollLeft decreasing
-                vertical: null,
-            }, {
-                rect: {
-                    left: rect.right - scrollActivationMargin,
-                    top: rect.top,
-                    right: rect.right,
-                    bottom: rect.bottom,
-                },
-                horizontal: 1, // scrolling right, i.e. scrollLeft increasing
-                vertical: null,
-            });
+        let record = knownScrollers.get(elem);
+        if (record) {
+            record.rect = rect; // Update the rect.
+        } else {
+            record = {
+                el: elem,
+                rect,
+                horizontal: horizontalScroll,
+                vertical: verticalScroll,
+                snap: Boolean(elem.dataset.omicronScrollSnap),
+                snapCooldown: false,
+            };
+            knownScrollers.set(elem, record);
         }
-        if (verticalScroll) {
-            triggerZones.push({
-                rect: {
-                    left: rect.left,
-                    top: rect.top,
-                    right: rect.right,
-                    bottom: rect.top + scrollActivationMargin,
-                },
-                horizontal: null,
-                vertical: -1, // scrolling up, i.e. scrollTop decreasing
-            }, {
-                rect: {
-                    left: rect.left,
-                    top: rect.bottom - scrollActivationMargin,
-                    right: rect.right,
-                    bottom: rect.bottom,
-                },
-                horizontal: null,
-                vertical: 1, // scrolling down, i.e. scrollTop increasing
-            });
-        }
-        result.push({
-            el: elem,
-            horizontalScroll,
-            verticalScroll,
-            triggerZones,
-        });
+        result.push(record);
     }
     return result;
-
 }
 
 // Compare function for hoverContainersByDepth.
