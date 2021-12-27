@@ -1,6 +1,7 @@
 const animMs = 100;
 
 let pointerId = null;
+let nativeDragStarted = false;
 let htmlOvescrollBehavior; // Cached value to be reverted after drag.
 let bodyOvescrollBehavior; // Cached value to be reverted after drag.
 let touchDrag = false;
@@ -135,10 +136,12 @@ function initDragContainer(containerEl, options) {
         options: Object.assign({}, defaultOptions, options || {}),
         domDepth: 0, // To be updated dynamically when added to hoverContainers.
     };
-    containerEl.addEventListener('touchdown', anyState_container_TouchDown);
+    // containerEl.addEventListener('touchdown', anyState_container_TouchDown);
     containerEl.addEventListener('pointerdown', anyState_container_PointerDown);
-    containerEl.addEventListener('pointerenter', anyState_container_PointerEnter);
-    containerEl.addEventListener('pointerleave', anyState_container_PointerLeave);
+    // containerEl.addEventListener('pointerenter', anyState_container_PointerEnter);
+    // containerEl.addEventListener('pointerleave', anyState_container_PointerLeave);
+    containerEl.addEventListener('dragenter', anyState_container_DragEnter);
+    containerEl.addEventListener('dragleave', anyState_container_DragLeave);
     containerEl.omicronDragAndDropData = containerData;
 }
 function setEvents_statePreDrag() {
@@ -147,7 +150,7 @@ function setEvents_statePreDrag() {
         document.addEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
         document.addEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
         document.addEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
-        document.addEventListener('pointermove', cancelIfCancellable, {passive: false});
+        // document.addEventListener('pointermove', statePreDrag_window_TouchEndOrCancel, {passive: false});
     } else {
         document.addEventListener('pointermove', statePreDrag_window_PointerMove);
         document.addEventListener('pointerup', statePreDrag_window_PointerUp, true);
@@ -159,39 +162,49 @@ function unsetEvents_statePreDrag() {
         document.removeEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
         document.removeEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
         document.removeEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
-        document.removeEventListener('pointermove', cancelIfCancellable, {passive: false});
+        // document.removeEventListener('pointermove', statePreDrag_window_TouchEndOrCancel, {passive: false});
     } else {
         document.removeEventListener('pointermove', statePreDrag_window_PointerMove);
         document.removeEventListener('pointerup', statePreDrag_window_PointerUp, true);
     }
 }
 function setEvents_stateDrag() {
-    if (touchDrag) {
-        // For preventing multi-touch while dragging.
-        document.addEventListener('touchdown', stateDrag_window_TouchDown);
-        // We need to capture touchmove events in order to call
-        // .preventDefault() on them and stop the scrolling.
-        // Calling .preventDefault() on PointerEvents doesn't do that.
-        document.addEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
-        document.addEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
-        document.addEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
-        document.addEventListener('pointermove', cancelIfCancellable, {passive: false});
-    } else {
-        document.addEventListener('pointermove', stateDrag_window_PointerMove);
-        document.addEventListener('pointerup', stateDrag_window_PointerUp, true);
-    }
+    activeEl.addEventListener('dragend', stateDrag_activeEl_DragEnd);
+    fromEl.addEventListener('dragstart', stateDrag_fromEl_DragStart);
+    document.addEventListener('pointerup', stateDrag_window_PointerUp, true);
+    // if (touchDrag) {
+    //     // For preventing multi-touch while dragging.
+    //     document.addEventListener('touchdown', stateDrag_window_TouchDown);
+    //     // We need to capture touchmove events in order to call
+    //     // .preventDefault() on them and stop the scrolling.
+    //     // Calling .preventDefault() on PointerEvents doesn't do that.
+    //     document.addEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
+    //     document.addEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
+    //     document.addEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
+    //     document.addEventListener('pointermove', cancelIfCancellable, {passive: false});
+    // } else {
+    //     document.addEventListener('pointermove', stateDrag_window_PointerMove);
+    //     document.addEventListener('pointerup', stateDrag_window_PointerUp, true);
+    // }
+    document.addEventListener('dragover', stateDrag_window_DragOver);
+    // activeEl.addEventListener('drag', stateDrag_activeEl_Drag);
 }
 function unsetEvents_stateDrag() {
-    if (touchDrag) {
-        document.removeEventListener('touchdown', stateDrag_window_TouchDown);
-        document.removeEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
-        document.removeEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
-        document.removeEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
-        document.removeEventListener('pointermove', cancelIfCancellable, {passive: false});
-    } else {
-        document.removeEventListener('pointermove', stateDrag_window_PointerMove);
-        document.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
-    }
+    activeEl.removeEventListener('dragend', stateDrag_activeEl_DragEnd);
+    fromEl.removeEventListener('dragstart', stateDrag_fromEl_DragStart);
+    document.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
+    // if (touchDrag) {
+    //     document.removeEventListener('touchdown', stateDrag_window_TouchDown);
+    //     document.removeEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
+    //     document.removeEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
+    //     document.removeEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
+    //     document.removeEventListener('pointermove', cancelIfCancellable, {passive: false});
+    // } else {
+    //     document.removeEventListener('pointermove', stateDrag_window_PointerMove);
+    //     document.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
+    // }
+    document.removeEventListener('dragover', stateDrag_window_DragOver);
+    // activeEl.removeEventListener('drag', stateDrag_activeEl_Drag);
 }
 function cancelIfCancellable(event) {
     if (event.cancelable) {
@@ -204,7 +217,7 @@ function anyState_container_TouchDown(event) {
     }
     touchDrag = true;
     // Note: nothing to do if startPreDrag fails, but it may change at some point.
-    startPreDrag(event, event);
+    startPreDragOrDrag(event, event);
 }
 function anyState_container_PointerDown(event) {
     // Unconditionally release pointer capture. I do that before any checks
@@ -227,9 +240,18 @@ function anyState_container_PointerDown(event) {
     }
     touchDrag = (event.pointerType === 'touch');
 
-    if (startPreDrag(event, event)) {
+    if (startPreDragOrDrag(event, event)) {
         pointerId = event.pointerId;
     }
+}
+
+// function stateDrag_activeEl_Drag(event) {
+//     console.log('stateDrag_activeEl_Drag', event);
+// }
+
+function stateDrag_activeEl_DragEnd(event) {
+    console.log('stateDrag_activeEl_DragEnd', event);
+    dragEndedWithRelease();
 }
 
 // TODO: Enable fallback event handlers in case PointerEvents are not available.
@@ -258,7 +280,7 @@ function anyState_container_PointerDown(event) {
 // }
 
 // Returns true if preDrag actually started.
-function startPreDrag(event, evPlace) {
+function startPreDragOrDrag(event, evPlace) {
     let containerData = event.currentTarget.omicronDragAndDropData;
     const containerOptions = containerData.options;
     activeEl = getItemFromContainerEvent(event, containerData.options);
@@ -292,24 +314,30 @@ function startPreDrag(event, evPlace) {
     // Should we go over the whole activeEl subtree and mark the containers there
     // as inactive? We may need to, actually.
 
-    setEvents_statePreDrag();
-
     xInitial = xLast = evPlace.clientX;
     yInitial = yLast = evPlace.clientY;
     initialActiveElRect = activeEl.getClientRects()[0];
 
-    // We are in statePreDrag. We will start the drag after a delay, or if
-    // the mouse moves sufficiently far. We will cancel the drag if the touch
-    // moves too far before the delay.
-    preDragTimeoutId = setTimeout(startDrag, delay);
+    if (touchDrag) {
+        // Start preDrag.
 
-    if (typeof containerOptions.onPreDragStart === 'function') {
-        containerOptions.onPreDragStart(fromEl, activeEl, event);
+        setEvents_statePreDrag();
+
+        // We are in statePreDrag. We will start the drag after a delay, or if
+        // the mouse moves sufficiently far. We will cancel the drag if the touch
+        // moves too far before the delay.
+        preDragTimeoutId = setTimeout(startNativeDrag, delay);
+
+        if (typeof containerOptions.onPreDragStart === 'function') {
+            containerOptions.onPreDragStart(fromEl, activeEl, event);
+        }
+    } else {
+        startNativeDrag();
     }
     return true;
 }
 
-function startDrag() {
+function startNativeDrag() {
     if (preDragTimeoutId) {
         clearTimeout(preDragTimeoutId);
         preDragTimeoutId = 0;
@@ -321,8 +349,34 @@ function startDrag() {
     }
 
     unsetEvents_statePreDrag();
+
+    clearSelection();
+
+    activeEl.draggable = true;
+
     setEvents_stateDrag();
 
+    if (touchDrag) {
+        startDragVisuallyAndSetSomeInitialValues();
+    }
+}
+
+function stateDrag_fromEl_DragStart(event) {
+    nativeDragStarted = true;
+    event.dataTransfer.setData('text/plain', activeEl.textContent);
+    event.dataTransfer.setData('application/x-omicron-drag-and-drop', activeEl.textContent);
+    event.dataTransfer.setDragImage(document.createElement('div'), 0, 0);
+    event.dataTransfer.effectAllowed = 'move';
+    console.log('dragstart successful');
+    // Make sure it is one-off.
+    fromEl.removeEventListener('dragstart', stateDrag_fromEl_DragStart);
+
+    if (!touchDrag) {
+        startDragVisuallyAndSetSomeInitialValues();
+    }
+}
+
+function startDragVisuallyAndSetSomeInitialValues() {
     scrollers = collectScrollers(toEl);
 
     // Prevent the scroll-to-refresh behavior and the effect
@@ -356,6 +410,8 @@ function startDrag() {
 
     createFloatEl();
 
+    let containerData = fromEl.omicronDragAndDropData;
+    const containerOptions = containerData.options;
     if (typeof containerOptions.onFloatElementCreated === 'function') {
         containerOptions.onFloatElementCreated(floatEl, fromEl, activeEl);
     }
@@ -408,7 +464,7 @@ function statePreDrag_window_PointerMove(event) {
     let yDiff = xLast - xInitial;
     let distanceSquaredFromInitial = xDiff * xDiff + yDiff * yDiff;
     if (distanceSquaredFromInitial >  minimalMoveMouse * minimalMoveMouse) {
-        startDrag();
+        startNativeDrag();
     }
 }
 function statePreDrag_window_PointerUp(event) {
@@ -439,8 +495,19 @@ function stateDrag_window_PointerMove(event) {
     if (event.pointerId !== pointerId) {
         return;
     }
+    if (event.cancelable) {
+        event.preventDefault();
+    }
 
     handleMove(event);
+}
+function stateDrag_window_DragOver(event) {
+    if (event.cancelable) {
+        event.preventDefault();
+    }
+
+    // console.log('stateDrag_window_DragOver', event, event.target);
+    handleMove(event.touches ? event.touches.item(0) : event);
 }
 
 // This is to be called only when the pointer actually moves.
@@ -763,7 +830,8 @@ function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
 }
 
 function stateDrag_window_TouchCancel(event) {
-    exitDrag(false);
+    console.log('touchcancel is sort of expected')
+    // exitDrag(false);
 }
 function stateDrag_window_TouchEnd(event) {
     dragEndedWithRelease();
@@ -774,7 +842,10 @@ function stateDrag_window_PointerUp(event) {
     if (event.pointerId !== pointerId) {
         return;
     }
-    dragEndedWithRelease();
+    if (!nativeDragStarted) {
+        // Pointer released without actual move.
+        exitDrag(false);
+    }
 }
 
 function dragEndedWithRelease() {
@@ -878,6 +949,7 @@ function exitDrag(execSort) {
         Anim.start(activeEl, [activeEl], 0, animMs, yDragClientPos - activeElRect.top);
     }
 
+    activeEl.draggable = false;
     unstyleActiveEl();
     deactivatePlaceholder();
 
@@ -900,6 +972,7 @@ function exitDrag(execSort) {
     document.body.style.overscrollBehavior = bodyOvescrollBehavior;
 
     pointerId = null;
+    nativeDragStarted = false;
     activeEl = null;
     floatEl = null;
     fromEl = null;
@@ -982,6 +1055,26 @@ function anyState_container_PointerLeave(event) {
 
     // mousemove handler will figure the container to enter.
     // TODO: if it gets glitchy, call the mousemove handler here directly.
+}
+
+function anyState_container_DragEnter(event) {
+    if (activeEl.contains(event.currentTarget)) {
+        // event.preventDefault();  // TODO: would it make sense?
+        // Ignore the interaction with activeEl.
+        return;
+    }
+    // console.log('anyState_container_DragEnter', event.currentTarget);
+    anyState_container_PointerEnter(event);
+}
+
+function anyState_container_DragLeave(event) {
+    // event.preventDefault();
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+        // console.log('anyState_container_DragLeave', event.currentTarget);
+        anyState_container_PointerLeave(event);
+    } else {
+        // console.log('anyState_container_DragLeave (ignored)', event.currentTarget);
+    }
 }
 
 function maybeEnterContainer(containerData, evPlace) {
@@ -1157,23 +1250,20 @@ function removeBottomPaddingCorrection() {
 }
 
 function styleActiveEl() {
-    // Theoretically some descendants can have visibility set explicitly
-    // to visible and then whey would be visible anyway, so let's double
-    // down with opacity: 0;
-    activeEl.style.visibility = 'hidden';
+    console.log('styleActiveEl');
+    // We can't set visibility = 'hidden' nor pointerEvents = 'none',
+    // they both break the native drag.
     activeEl.style.opacity = 0;
-    activeEl.style.pointerEvents = 'none';
     activeEl.classList.add('drag-active-item');
 }
 
 function unstyleActiveEl() {
+    console.log('unstyleActiveEl');
     // Note: if there were any inline styles on the element, uh, we have
     // just erased them. I think that is resonable to force users to just
     // deal with it.
     activeEl.classList.remove('drag-active-item');
-    activeEl.style.visibility = null;
     activeEl.style.opacity = null;
-    activeEl.style.pointerEvents = null;
 }
 
 function createFloatEl() {
@@ -1429,6 +1519,21 @@ function getItemFromContainerEvent(event, options) {
         return result;
     else {
         return null;
+    }
+}
+
+function clearSelection() {
+    // Copied over from Sortable. May be necessary for native drag.
+    try {
+        if (document.selection) {
+            // Timeout neccessary for IE9
+            _nextTick(function () {
+                document.selection.empty();
+            });
+        } else {
+            window.getSelection().removeAllRanges();
+        }
+    } catch (err) {
     }
 }
 
