@@ -143,54 +143,54 @@ function initDragContainer(containerEl, options) {
 }
 function setEvents_statePreDrag() {
     if (touchDrag) {
-        window.addEventListener('touchdown', statePreDrag_window_TouchDown);
-        window.addEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
-        window.addEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
-        window.addEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
-        window.addEventListener('pointermove', cancelIfCancellable, {passive: false});
+        document.addEventListener('touchdown', statePreDrag_window_TouchDown);
+        document.addEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
+        document.addEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
+        document.addEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
+        document.addEventListener('pointermove', cancelIfCancellable, {passive: false});
     } else {
-        window.addEventListener('pointermove', statePreDrag_window_PointerMove);
-        window.addEventListener('pointerup', statePreDrag_window_PointerUp, true);
+        document.addEventListener('pointermove', statePreDrag_window_PointerMove);
+        document.addEventListener('pointerup', statePreDrag_window_PointerUp, true);
     }
 }
 function unsetEvents_statePreDrag() {
     if (touchDrag) {
-        window.removeEventListener('touchdown', statePreDrag_window_TouchDown);
-        window.removeEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
-        window.removeEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
-        window.removeEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
-        window.removeEventListener('pointermove', cancelIfCancellable, {passive: false});
+        document.removeEventListener('touchdown', statePreDrag_window_TouchDown);
+        document.removeEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
+        document.removeEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
+        document.removeEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
+        document.removeEventListener('pointermove', cancelIfCancellable, {passive: false});
     } else {
-        window.removeEventListener('pointermove', statePreDrag_window_PointerMove);
-        window.removeEventListener('pointerup', statePreDrag_window_PointerUp, true);
+        document.removeEventListener('pointermove', statePreDrag_window_PointerMove);
+        document.removeEventListener('pointerup', statePreDrag_window_PointerUp, true);
     }
 }
 function setEvents_stateDrag() {
     if (touchDrag) {
         // For preventing multi-touch while dragging.
-        window.addEventListener('touchdown', stateDrag_window_TouchDown);
+        document.addEventListener('touchdown', stateDrag_window_TouchDown);
         // We need to capture touchmove events in order to call
         // .preventDefault() on them and stop the scrolling.
         // Calling .preventDefault() on PointerEvents doesn't do that.
-        window.addEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
-        window.addEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
-        window.addEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
-        window.addEventListener('pointermove', cancelIfCancellable, {passive: false});
+        document.addEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
+        document.addEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
+        document.addEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
+        document.addEventListener('pointermove', cancelIfCancellable, {passive: false});
     } else {
-        window.addEventListener('pointermove', stateDrag_window_PointerMove);
-        window.addEventListener('pointerup', stateDrag_window_PointerUp, true);
+        document.addEventListener('pointermove', stateDrag_window_PointerMove);
+        document.addEventListener('pointerup', stateDrag_window_PointerUp, true);
     }
 }
 function unsetEvents_stateDrag() {
     if (touchDrag) {
-        window.removeEventListener('touchdown', stateDrag_window_TouchDown);
-        window.removeEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
-        window.removeEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
-        window.removeEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
-        window.removeEventListener('pointermove', cancelIfCancellable, {passive: false});
+        document.removeEventListener('touchdown', stateDrag_window_TouchDown);
+        document.removeEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
+        document.removeEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
+        document.removeEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
+        document.removeEventListener('pointermove', cancelIfCancellable, {passive: false});
     } else {
-        window.removeEventListener('pointermove', stateDrag_window_PointerMove);
-        window.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
+        document.removeEventListener('pointermove', stateDrag_window_PointerMove);
+        document.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
     }
 }
 function cancelIfCancellable(event) {
@@ -780,7 +780,7 @@ function stateDrag_window_PointerUp(event) {
 function dragEndedWithRelease() {
     // We can't really prevent the browser for generating a click, but we
     // can capture it.
-    window.addEventListener('click', preventNextClick, true);
+    document.addEventListener('click', preventNextClick, true);
     // The click will, however, not necessaily generate (only when there
     // was an element that browser thinks was clicked), so let's make sure
     // the blocker is removed.
@@ -796,10 +796,10 @@ function dragEndedWithRelease() {
 function preventNextClick(event) {
     event.stopPropagation();
     event.preventDefault();
-    window.removeEventListener('click', preventNextClick, true);
+    document.removeEventListener('click', preventNextClick, true);
 }
 function removeClickBlocker() {
-    window.removeEventListener('click', preventNextClick, true);
+    document.removeEventListener('click', preventNextClick, true);
 }
 
 function exitDrag(execSort) {
