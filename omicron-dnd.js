@@ -135,62 +135,48 @@ function initDragContainer(containerEl, options) {
         options: Object.assign({}, defaultOptions, options || {}),
         domDepth: 0, // To be updated dynamically when added to hoverContainers.
     };
-    containerEl.addEventListener('touchdown', anyState_container_TouchDown, {passive: false, capture: false});
-    containerEl.addEventListener('pointerdown', anyState_container_PointerDown, {passive: false, capture: false});
-    containerEl.addEventListener('pointerenter', anyState_container_PointerEnter, {passive: false, capture: false});
-    containerEl.addEventListener('pointerleave', anyState_container_PointerLeave, {passive: false, capture: false});
+    toggleListeners(true, containerEl, [
+        ['touchdown', anyState_container_TouchDown],
+        ['pointerdown', anyState_container_PointerDown],
+        ['pointerenter', anyState_container_PointerEnter],
+        ['pointerleave', anyState_container_PointerLeave],
+    ]);
     containerEl.omicronDragAndDropData = containerData;
 }
-function setEvents_statePreDrag() {
+function toggleEvents_statePreDrag(toggleOn) {
     if (touchDrag) {
-        document.addEventListener('touchdown', statePreDrag_window_TouchDown, {passive: false, capture: false});
-        document.addEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false, capture: false});
-        document.addEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false, capture: false});
-        document.addEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false, capture: false});
-        document.addEventListener('pointermove', cancelIfCancellable, {passive: false, capture: false});
+        toggleListeners(toggleOn, document, [
+            ['touchdown', statePreDrag_window_TouchDown],
+            ['touchmove', statePreDrag_window_TouchMove],
+            ['touchend', statePreDrag_window_TouchEndOrCancel],
+            ['touchcancel', statePreDrag_window_TouchEndOrCancel],
+            ['pointermove', cancelIfCancellable],
+        ]);
     } else {
-        document.addEventListener('pointermove', statePreDrag_window_PointerMove, {passive: false, capture: false});
-        document.addEventListener('pointerup', statePreDrag_window_PointerUp, {passive: false, capture: false});
+        toggleListeners(toggleOn, document, [
+            ['pointermove', statePreDrag_window_PointerMove],
+            ['pointerup', statePreDrag_window_PointerUp],
+        ]);
     }
 }
-function unsetEvents_statePreDrag() {
+function toggleEvents_stateDrag(toggleOn) {
     if (touchDrag) {
-        document.removeEventListener('touchdown', statePreDrag_window_TouchDown, {passive: false, capture: false});
-        document.removeEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false, capture: false});
-        document.removeEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false, capture: false});
-        document.removeEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false, capture: false});
-        document.removeEventListener('pointermove', cancelIfCancellable, {passive: false, capture: false});
+        toggleListeners(toggleOn, document, [
+            // For preventing multi-touch while dragging.
+            ['touchdown', stateDrag_window_TouchDown],
+            // We need to capture touchmove events in order to call
+            // .preventDefault() on them and stop the scrolling.
+            // Calling .preventDefault() on PointerEvents doesn't do that.
+            ['touchmove', stateDrag_window_TouchMove],
+            ['touchend', stateDrag_window_TouchEnd],
+            ['touchcancel', stateDrag_window_TouchCancel],
+            ['pointermove', cancelIfCancellable],
+        ]);
     } else {
-        document.removeEventListener('pointermove', statePreDrag_window_PointerMove, {passive: false, capture: false});
-        document.removeEventListener('pointerup', statePreDrag_window_PointerUp, {passive: false, capture: false});
-    }
-}
-function setEvents_stateDrag() {
-    if (touchDrag) {
-        // For preventing multi-touch while dragging.
-        document.addEventListener('touchdown', stateDrag_window_TouchDown, {passive: false, capture: false});
-        // We need to capture touchmove events in order to call
-        // .preventDefault() on them and stop the scrolling.
-        // Calling .preventDefault() on PointerEvents doesn't do that.
-        document.addEventListener('touchmove', stateDrag_window_TouchMove, {passive: false, capture: false});
-        document.addEventListener('touchend', stateDrag_window_TouchEnd, {passive: false, capture: false});
-        document.addEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false, capture: false});
-        document.addEventListener('pointermove', cancelIfCancellable, {passive: false, capture: false});
-    } else {
-        document.addEventListener('pointermove', stateDrag_window_PointerMove, {passive: false, capture: false});
-        document.addEventListener('pointerup', stateDrag_window_PointerUp, {passive: false, capture: false});
-    }
-}
-function unsetEvents_stateDrag() {
-    if (touchDrag) {
-        document.removeEventListener('touchdown', stateDrag_window_TouchDown, {passive: false, capture: false});
-        document.removeEventListener('touchmove', stateDrag_window_TouchMove, {passive: false, capture: false});
-        document.removeEventListener('touchend', stateDrag_window_TouchEnd, {passive: false, capture: false});
-        document.removeEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false, capture: false});
-        document.removeEventListener('pointermove', cancelIfCancellable, {passive: false, capture: false});
-    } else {
-        document.removeEventListener('pointermove', stateDrag_window_PointerMove, {passive: false, capture: false});
-        document.removeEventListener('pointerup', stateDrag_window_PointerUp, {passive: false, capture: false});
+        toggleListeners(toggleOn, document, [
+            ['pointermove', stateDrag_window_PointerMove],
+            ['pointerup', stateDrag_window_PointerUp],
+        ]);
     }
 }
 function cancelIfCancellable(event) {
@@ -292,7 +278,7 @@ function startPreDrag(event, evPlace) {
     // Should we go over the whole activeEl subtree and mark the containers there
     // as inactive? We may need to, actually.
 
-    setEvents_statePreDrag();
+    toggleEvents_statePreDrag(true);
 
     xInitial = xLast = evPlace.clientX;
     yInitial = yLast = evPlace.clientY;
@@ -320,8 +306,8 @@ function startDrag() {
         containerOptions.onBeforeDragStart(fromEl, activeEl);
     }
 
-    setEvents_stateDrag();
-    unsetEvents_statePreDrag();
+    toggleEvents_stateDrag(true);
+    toggleEvents_statePreDrag(false);
 
     scrollers = collectScrollers(toEl);
 
@@ -892,8 +878,8 @@ function exitDrag(execSort) {
         }
     }
 
-    unsetEvents_statePreDrag();
-    unsetEvents_stateDrag();
+    toggleEvents_statePreDrag(false);
+    toggleEvents_stateDrag(false);
 
     // Revert the original overscroll behavior.
     document.documentElement.style.overscrollBehavior = htmlOvescrollBehavior;
@@ -1429,6 +1415,16 @@ function getItemFromContainerEvent(event, options) {
         return result;
     else {
         return null;
+    }
+}
+
+const eventListenerOptionsArg = {passive: false, capture: false};
+
+function toggleListeners(toggleOn, element, eventHandlerPairs) {
+    const toggle =
+        toggleOn ? HTMLElement.prototype.addEventListener : HTMLElement.prototype.removeEventListener;
+    for (const [eventName, handler] of eventHandlerPairs) {
+        toggle.call(element, eventName, handler, eventListenerOptionsArg);
     }
 }
 
