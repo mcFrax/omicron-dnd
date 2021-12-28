@@ -211,6 +211,7 @@
                         console.log('onFloatElementCreated (nested)', floatEl, containerEl, activeEl);
                         floatEl.classList.add('nested-float');
                     },
+                    floatElScale: 0.9,
                 });
             } else {
                 OmicronDnd.init(containerEl, {
@@ -219,6 +220,7 @@
                     //         return [4];
                     //     }
                     // },
+                    floatElScale: 0.8,
                     onBeforePreDrag(containerEl, activeEl, event) {
                         console.log('onBeforePreDrag', containerEl, activeEl, event);
                     },

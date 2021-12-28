@@ -8,6 +8,7 @@ let fromEl = null;
 let toEl = null;
 let activeEl = null;
 let floatEl = null;
+let floatElScale = 1;
 let placeholderEl = null;
 // TODO: current semantic is actually spliceIndex+insertIndex. It would
 // be likely better to change it to actually oldIndex and newIndex.
@@ -66,6 +67,8 @@ const defaultOptions = {
     // each drag, and the result will be cached.
     forbiddenInsertionIndicesFn: null,
     // createFloatElemFn: null,
+
+    floatElScale: 1,
 
     // onBeforePreDrag: Called just before preDrag starts.
     // Return explicit `false` to cancel the drag.
@@ -340,6 +343,7 @@ function startDrag() {
     placeholderEl.style.transform = `translateY(${activeEl.offsetTop}px)`;
     activatePlaceholder();
 
+    floatElScale = containerOptions.floatElScale;
     createFloatEl();
 
     if (typeof containerOptions.onFloatElementCreated === 'function') {
@@ -1039,7 +1043,7 @@ function animationFrame(timestamp) {
     animFrameRequestId = 0;  // Allow scheduling for the next frame.
     if (floatEl) {
         // TODO: adjust for scroll or other changes of the base.
-        floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px)`;
+        floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px) scale(${floatElScale})`;
     }
     let needsNextFrame = false;
     if (activeScrollers.length !== 0) {
@@ -1173,7 +1177,9 @@ function createFloatEl() {
     floatEl.style.pointerEvents = 'none';
 
     floatEl.style.width = getComputedStyle(activeEl).width;
-    floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px)`;
+    floatEl.style.height = getComputedStyle(activeEl).height;
+    floatEl.style.transformOrigin = `${-xCursorOffset}px ${-yCursorOffset}px`;
+    floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px) scale(${floatElScale})`;
     floatEl.classList.add('drag-float-item');
 
     // Position fixed is great, but it has limitation: if any ancestor
