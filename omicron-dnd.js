@@ -320,8 +320,8 @@ function startDrag() {
         containerOptions.onBeforeDragStart(fromEl, activeEl);
     }
 
-    unsetEvents_statePreDrag();
     setEvents_stateDrag();
+    unsetEvents_statePreDrag();
 
     scrollers = collectScrollers(toEl);
 
