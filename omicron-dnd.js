@@ -150,7 +150,7 @@ function toggleEvents_statePreDrag(toggleOn) {
     if (touchDrag) {
         toggleListeners(toggleOn, document, [
             ['touchdown', statePreDrag_window_TouchDown],
-            ['touchmove', statePreDrag_window_TouchMove],
+            // ['touchmove', statePreDrag_window_TouchMove],
             ['touchend', statePreDrag_window_TouchEndOrCancel],
             ['touchcancel', statePreDrag_window_TouchEndOrCancel],
             ['pointermove', cancelIfCancellable],
@@ -159,6 +159,14 @@ function toggleEvents_statePreDrag(toggleOn) {
         toggleListeners(toggleOn, document, [
             ['pointermove', statePreDrag_window_PointerMove],
             ['pointerup', statePreDrag_window_PointerUp],
+        ]);
+    }
+    if (touchDrag && toggleOn) {
+        // Set the single common touchmove listener for both preDrag&Drag.
+        // exitDrag will call toggleEvents_stateDrag(false) anyway, so we don't
+        // need to care about it when called with toggleOn=false.
+        toggleListeners(toggleOn, document, [
+            ['touchmove', stateDrag_window_TouchMove],
         ]);
     }
 }
@@ -412,6 +420,11 @@ function stateDrag_window_TouchDown(event) {
     exitDrag(false);
 }
 function stateDrag_window_TouchMove(event) {
+    if (preDragTimeoutId) {
+        // Touch in preDrag.
+        exitDrag(0);
+        return;
+    }
     if (event.cancelable) {
         // Prevent scroll.
         event.preventDefault();
