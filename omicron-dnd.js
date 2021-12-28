@@ -135,62 +135,62 @@ function initDragContainer(containerEl, options) {
         options: Object.assign({}, defaultOptions, options || {}),
         domDepth: 0, // To be updated dynamically when added to hoverContainers.
     };
-    containerEl.addEventListener('touchdown', anyState_container_TouchDown);
-    containerEl.addEventListener('pointerdown', anyState_container_PointerDown);
-    containerEl.addEventListener('pointerenter', anyState_container_PointerEnter);
-    containerEl.addEventListener('pointerleave', anyState_container_PointerLeave);
+    containerEl.addEventListener('touchdown', anyState_container_TouchDown, {passive: false, capture: false});
+    containerEl.addEventListener('pointerdown', anyState_container_PointerDown, {passive: false, capture: false});
+    containerEl.addEventListener('pointerenter', anyState_container_PointerEnter, {passive: false, capture: false});
+    containerEl.addEventListener('pointerleave', anyState_container_PointerLeave, {passive: false, capture: false});
     containerEl.omicronDragAndDropData = containerData;
 }
 function setEvents_statePreDrag() {
     if (touchDrag) {
-        document.addEventListener('touchdown', statePreDrag_window_TouchDown);
-        document.addEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
-        document.addEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
-        document.addEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
-        document.addEventListener('pointermove', cancelIfCancellable, {passive: false});
+        document.addEventListener('touchdown', statePreDrag_window_TouchDown, {passive: false, capture: false});
+        document.addEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false, capture: false});
+        document.addEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false, capture: false});
+        document.addEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false, capture: false});
+        document.addEventListener('pointermove', cancelIfCancellable, {passive: false, capture: false});
     } else {
-        document.addEventListener('pointermove', statePreDrag_window_PointerMove);
-        document.addEventListener('pointerup', statePreDrag_window_PointerUp, true);
+        document.addEventListener('pointermove', statePreDrag_window_PointerMove, {passive: false, capture: false});
+        document.addEventListener('pointerup', statePreDrag_window_PointerUp, {passive: false, capture: false});
     }
 }
 function unsetEvents_statePreDrag() {
     if (touchDrag) {
-        document.removeEventListener('touchdown', statePreDrag_window_TouchDown);
-        document.removeEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false});
-        document.removeEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false});
-        document.removeEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false});
-        document.removeEventListener('pointermove', cancelIfCancellable, {passive: false});
+        document.removeEventListener('touchdown', statePreDrag_window_TouchDown, {passive: false, capture: false});
+        document.removeEventListener('touchmove', statePreDrag_window_TouchMove, {passive: false, capture: false});
+        document.removeEventListener('touchend', statePreDrag_window_TouchEndOrCancel, {passive: false, capture: false});
+        document.removeEventListener('touchcancel', statePreDrag_window_TouchEndOrCancel, {passive: false, capture: false});
+        document.removeEventListener('pointermove', cancelIfCancellable, {passive: false, capture: false});
     } else {
-        document.removeEventListener('pointermove', statePreDrag_window_PointerMove);
-        document.removeEventListener('pointerup', statePreDrag_window_PointerUp, true);
+        document.removeEventListener('pointermove', statePreDrag_window_PointerMove, {passive: false, capture: false});
+        document.removeEventListener('pointerup', statePreDrag_window_PointerUp, {passive: false, capture: false});
     }
 }
 function setEvents_stateDrag() {
     if (touchDrag) {
         // For preventing multi-touch while dragging.
-        document.addEventListener('touchdown', stateDrag_window_TouchDown);
+        document.addEventListener('touchdown', stateDrag_window_TouchDown, {passive: false, capture: false});
         // We need to capture touchmove events in order to call
         // .preventDefault() on them and stop the scrolling.
         // Calling .preventDefault() on PointerEvents doesn't do that.
-        document.addEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
-        document.addEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
-        document.addEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
-        document.addEventListener('pointermove', cancelIfCancellable, {passive: false});
+        document.addEventListener('touchmove', stateDrag_window_TouchMove, {passive: false, capture: false});
+        document.addEventListener('touchend', stateDrag_window_TouchEnd, {passive: false, capture: false});
+        document.addEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false, capture: false});
+        document.addEventListener('pointermove', cancelIfCancellable, {passive: false, capture: false});
     } else {
-        document.addEventListener('pointermove', stateDrag_window_PointerMove);
-        document.addEventListener('pointerup', stateDrag_window_PointerUp, true);
+        document.addEventListener('pointermove', stateDrag_window_PointerMove, {passive: false, capture: false});
+        document.addEventListener('pointerup', stateDrag_window_PointerUp, {passive: false, capture: false});
     }
 }
 function unsetEvents_stateDrag() {
     if (touchDrag) {
-        document.removeEventListener('touchdown', stateDrag_window_TouchDown);
-        document.removeEventListener('touchmove', stateDrag_window_TouchMove, {passive: false});
-        document.removeEventListener('touchend', stateDrag_window_TouchEnd, {passive: false});
-        document.removeEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false});
-        document.removeEventListener('pointermove', cancelIfCancellable, {passive: false});
+        document.removeEventListener('touchdown', stateDrag_window_TouchDown, {passive: false, capture: false});
+        document.removeEventListener('touchmove', stateDrag_window_TouchMove, {passive: false, capture: false});
+        document.removeEventListener('touchend', stateDrag_window_TouchEnd, {passive: false, capture: false});
+        document.removeEventListener('touchcancel', stateDrag_window_TouchCancel, {passive: false, capture: false});
+        document.removeEventListener('pointermove', cancelIfCancellable, {passive: false, capture: false});
     } else {
-        document.removeEventListener('pointermove', stateDrag_window_PointerMove);
-        document.removeEventListener('pointerup', stateDrag_window_PointerUp, true);
+        document.removeEventListener('pointermove', stateDrag_window_PointerMove, {passive: false, capture: false});
+        document.removeEventListener('pointerup', stateDrag_window_PointerUp, {passive: false, capture: false});
     }
 }
 function cancelIfCancellable(event) {
