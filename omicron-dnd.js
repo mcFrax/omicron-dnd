@@ -1257,7 +1257,15 @@ function collectScrollers(elem) {
         if (!horizontalScroll && !verticalScroll) {
             continue;
         }
-        let rect = elem.getClientRects()[0];
+        let domRect = elem.getClientRects()[0];
+        // Create our own structure. Origina DOMRect is read-only, and
+        // we want to be able to make updates.
+        let rect = {
+            left: domRect.left,
+            top: domRect.top,
+            right: domRect.right,
+            bottom: domRect.bottom,
+        };
         let record = knownScrollers.get(elem);
         if (record) {
             record.rect = rect; // Update the rect.
