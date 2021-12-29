@@ -225,6 +225,19 @@ function anyState_container_PointerDown(event) {
     // Source: https://stackoverflow.com/questions/27908339/js-touch-equivalent-for-mouseenter
     event.target.releasePointerCapture(event.pointerId);
 
+    let hasParentContainer = false;
+    for (let el = event.currentTarget.parentElement; el; el = el.parentElement) {
+        if (el.omicronDragAndDropData) {
+            hasParentContainer = true;
+            break;
+        }
+    }
+    if (!hasParentContainer) {
+        // Only let the event propagate if there are other containers below,
+        // but don't let it go outside.
+        event.stopPropagation();
+    }
+
     if (activeEl !== null || pointerId !== null) {
         return;
     }
