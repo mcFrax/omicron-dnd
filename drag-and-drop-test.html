@@ -130,7 +130,7 @@
             padding: 1vmin;
             user-select: text;
         }
-        #modules-warning {
+        .failure-dialog {
             display: none;
             position: fixed;
             z-index: 1000;
@@ -199,7 +199,13 @@
             <div class="drag-container">
             </div>
         </div>
-        <div id="modules-warning">
+        <div id="no-sortable-error-dialog" class="failure-dialog">
+            <p>
+                Failed to load Sortable library.
+            </p>
+            <code id="no-sortable-error-text"></code>
+        </div>
+        <div id="modules-error-dialog" class="failure-dialog">
             <p>
                 Unfortunately, ES6 modules don't work in files open from
                 disk. Start a python server instead, and open the page
@@ -278,12 +284,47 @@
 
         console.log('console.log and dispatchEvent monkey patched.');
     </script>
-    <script type="module">
+    <script type="module" async>
         import OmicronDnd from './omicron-dnd.js';
-        import Sortable from './sortable.core.esm.js';
 
         let $ = (s) => document.querySelector(s);
         let $$ = (s) => Array.from(document.querySelectorAll(s));
+
+        // Parse url params.
+
+        let urlParams = new URLSearchParams(document.location.search);
+
+        const useSortable = String(urlParams.get('dragEngine')).toLowerCase() === 'sortable';
+
+        const title = `Drag&drop test (${useSortable ? 'Sortable' : 'Omicron'})`;
+        $('#page-title').textContent = document.title = title;
+
+        let urlParams1 = new URLSearchParams(document.location.search);
+        urlParams1.set('dragEngine', 'omicron');
+        $('#go-to-omicron').href = '?' + urlParams1;
+
+        urlParams1.set('dragEngine', 'sortable');
+        $('#go-to-sortable').href = '?' + urlParams1;
+
+        // Force fallback unless explicitly set to 0 or false.
+        let sortableForceFallback = !['0', 'false'].includes(urlParams.get('sortableForceFallback'));
+        console.log('sortableForceFallback', sortableForceFallback);
+
+        // Dynamically import sortable. That allows to start without sortable
+        // if not necessary, and prevents having Sortable's global handler
+        // firing when testing Omicron.
+        let Sortable;
+        if (useSortable) {
+            try {
+                const sortableModule = await import('./sortable.core.esm.js');
+                console.log(sortableModule);
+                Sortable = sortableModule.default;
+            } catch (e) {
+                console.error('Failed to load Sortable.');
+                document.getElementById('no-sortable-error-text').textContent = e.toString();
+                document.getElementById('no-sortable-error-dialog').style.display = 'block';
+            }
+        }
 
         function addGreenItemsButtonClick() {
             addGreenItems(parseInt($('#greenNumber').value));
@@ -364,8 +405,6 @@
             });
         }
 
-        let sortableForceFallback = true;
-
         function initContainerSortable(containerEl) {
             Sortable.create(containerEl, {
                 group: 'cards',
@@ -412,25 +451,7 @@
 
         // Init.
 
-        let urlParams = new URLSearchParams(document.location.search);
-
         addGreenItems(urlParams.get('extraItems') ? parseInt(urlParams.get('extraItems'), 10) : 4);
-
-        const useSortable = String(urlParams.get('dragEngine')).toLowerCase() === 'sortable';
-
-        const title = `Drag&drop test (${useSortable ? 'Sortable' : 'Omicron'})`;
-        $('#page-title').textContent = document.title = title;
-
-        let urlParams1 = new URLSearchParams(document.location.search);
-        urlParams1.set('dragEngine', 'omicron');
-        $('#go-to-omicron').href = '?' + urlParams1;
-
-        urlParams1.set('dragEngine', 'sortable');
-        $('#go-to-sortable').href = '?' + urlParams1;
-
-        // Force fallback unless explicitly set to 0 or false.
-        sortableForceFallback = !['0', 'false'].includes(urlParams.get('sortableForceFallback'));
-        console.log('sortableForceFallback', sortableForceFallback);
 
 
         let initTop = initTopContainerOmicron;
@@ -453,7 +474,7 @@
     </script>
     <script>
         if (location.protocol === 'file:') {
-            document.getElementById('modules-warning').style.display = 'block';
+            document.getElementById('modules-error-dialog').style.display = 'block';
         }
     </script>
 </body>
