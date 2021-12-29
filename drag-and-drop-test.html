@@ -2,7 +2,8 @@
 <html lang="en-us">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <title>JS Test</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimal-ui" />
+    <title>Drag&drop test</title>
     <style>
         html,
         body {
@@ -11,14 +12,23 @@
             /* Would be nice to set it dynamically during drag, but let's
              * not overdo it yet. */
             overscroll-behavior-y: none;
+            position: fixed;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
         }
         .horizontal-layout {
             display: flex;
             flex-direction: row;
+            align-items: stretch;
+            overflow-x: auto;
         }
         .scroll-container {
             width: 400px;
-            height: 80vh;
+            min-width: 300px;
             overflow: hidden scroll;
             background: aliceblue;
         }
@@ -26,6 +36,9 @@
             position: relative;
             overflow: visible; /* for the placeholder to be visible when hanging from the bottom */
             padding: 10px;
+        }
+        .scroll-container>.drag-container {
+            min-height: 60px;
         }
         .drag-container.nested {
             margin: 4px;
@@ -89,6 +102,34 @@
             border: 1px solid black;
             background: lightgray;
         }
+        .variant-link {
+            margin: 0 8px;
+        }
+        #log-container {
+            display: none;
+            flex-direction: column;
+            position: fixed;
+            z-index: 1000;
+            left: 10%;
+            top: 10%;
+            right: 10%;
+            bottom: 10%;
+            border: 1vmin solid black;
+            background: lightgray;
+            padding: 2vmin;
+            user-select: none;
+        }
+        #log-content {
+            flex: 1;
+            overflow-y: scroll;
+            overflow-x: auto;
+            white-space: pre;
+            background: white;
+            font-family: monospace;
+            margin: 2vmin;
+            padding: 1vmin;
+            user-select: text;
+        }
         #modules-warning {
             display: none;
             position: fixed;
@@ -108,10 +149,13 @@
     </style>
 </head>
 <body>
-    <h1>Drag&drop test</h1>
+    <h1 id="page-title">Drag&drop test</h1>
     <div>
         <input type="number" value="2" min="1", max="1000" id="greenNumber">
         <button id="add-green-button">Add items</button>
+        <a id="go-to-omicron" class="variant-link">Omicron</a>
+        <a id="go-to-sortable" class="variant-link">Sortable</a>
+        <button id="show-log-button">Show log</button>
     </div>
     <div class="horizontal-layout">
         <div class="scroll-container">
@@ -166,8 +210,77 @@
             </code>
         </div>
     </div>
+    <div id="log-container">
+        <div>
+            <button id="hide-log-button">Hide log</button>
+            <button id="copy-log-button">Copy to clipboard</button>
+        </div>
+        <div id="log-content"></div>
+    </div>
+    <script type="module">
+        // Instrumentation, before imports.
+
+        let nextElemId = 0;
+        let knownElems = new Map();
+
+        function getElemId(elem) {
+            let id = knownElems.get(elem);
+            if (id == null) {
+                id = nextElemId++;
+                knownElems.set(elem, id);
+            }
+            return id;
+        }
+
+        function stringifyLogInput(input) {
+            let className = Object.prototype.toString.call(input).slice(8, -1);
+            if (input === document) {
+                return 'document';
+            }
+            if (input === window) {
+                return 'window';
+            }
+            if (input instanceof HTMLElement) {
+                return `${className}<${input.tagName}#${input.id}.${Array.from(input.classList).join('.')}//${getElemId(input)}>`;
+            }
+            if (input instanceof Event) {
+                let extraData = ` x:${input.clientX} y:${input.clientY} trusted:${input.isTrusted}`;
+                if (input instanceof MouseEvent) {
+                    extraData += ` buttons:${input.buttons}`;
+                }
+                if (input instanceof PointerEvent) {
+                    extraData += ` pointerType:${input.pointerType} pointerId:${input.pointerId}`;
+                }
+                if (input instanceof TouchEvent) {
+                    extraData += ` touches:${JSON.stringify(Array.from(input.touches).map(t => ({x: t.clientX, y: t.clientY})))}`;
+                }
+                return `${className}<${input.type}${extraData}>`;
+            }
+            try {
+                return JSON.stringify(input);
+            } catch (e) {
+                return String(input);
+            }
+        }
+
+        window.myLogLines = [];
+        const originalLog = console.log;
+        console.log = (...args) => {
+            originalLog.call(console, ...args);
+            window.myLogLines.push(args.map(stringifyLogInput).join(' '));
+        };
+
+        const originalDispatchEvent = HTMLElement.prototype.dispatchEvent;
+        HTMLElement.prototype.dispatchEvent = function (e, ...args) {
+            console.log('DISPATCH', e, ...args);
+            originalLog.call(this, e, ...args);
+        }
+
+        console.log('console.log and dispatchEvent monkey patched.');
+    </script>
     <script type="module">
         import OmicronDnd from './omicron-dnd.js';
+        import Sortable from './sortable.core.esm.js';
 
         let $ = (s) => document.querySelector(s);
         let $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -200,56 +313,141 @@
             }
         }
 
-        // Init.
+        // Init functions.
+
+        function initTopContainerOmicron(containerEl) {
+            OmicronDnd.init(containerEl, {
+                // forbiddenInsertionIndicesFn(c) {
+                //     if (c === containerEl) {
+                //         return [4];
+                //     }
+                // },
+                floatElScale: 0.8,
+                onBeforePreDrag(containerEl, activeEl, event) {
+                    console.log('onBeforePreDrag', containerEl, activeEl, event);
+                },
+                onPreDragStart(containerEl, activeEl, event) {
+                    console.log('onPreDragStart', containerEl, activeEl, event);
+                },
+                onBeforeDragStart(containerEl, activeEl) {
+                    console.log('onBeforeDragStart', containerEl, activeEl);
+                },
+                onFloatElementCreated(floatEl, containerEl, activeEl) {
+                    console.log('onFloatElementCreated', floatEl, containerEl, activeEl);
+                },
+                onDragStart(containerEl, activeEl) {
+                    console.log('onDragStart', containerEl, activeEl);
+                },
+                onInternalChange(event) {
+                    console.log('onInternalChange', event);
+                },
+                onDropToOtherContainer(event) {
+                    console.log('onDropToOtherContainer', event);
+                },
+                onDropFromOtherContainer(event) {
+                    console.log('onDropFromOtherContainer', event);
+                },
+                onDragFinished(event) {
+                    console.log('onDragFinished', event);
+                },
+            });
+        }
+
+        function initNestedContainerOmicron(containerEl) {
+            OmicronDnd.init(containerEl, {
+                enterGuardLeft: 0.4,
+                onFloatElementCreated(floatEl, containerEl, activeEl) {
+                    console.log('onFloatElementCreated (nested)', floatEl, containerEl, activeEl);
+                    floatEl.classList.add('nested-float');
+                },
+                floatElScale: 0.9,
+            });
+        }
+
+        let sortableForceFallback = true;
+
+        function initContainerSortable(containerEl) {
+            Sortable.create(containerEl, {
+                group: 'cards',
+                direction: 'vertical',
+                fallbackTolerance: 5,
+                preventOnFilter: false,
+                draggable: '.card',
+                animation: 100,
+                delay: 220,
+                delayOnTouchOnly: true,
+                forceFallback: sortableForceFallback,
+            });
+        }
+
+        // Buttons.
         $('#add-green-button').addEventListener('click', addGreenItemsButtonClick);
-        addGreenItems(4);
+        $('#show-log-button').addEventListener('click', () => {
+            $('#log-content').textContent = window.myLogLines.join('\n');
+            $('#log-container').style.display = 'flex';
+        });
+        $('#hide-log-button').addEventListener('click', () => {
+            $('#log-container').style.display = 'none';
+        });
+
+        if (navigator.clipboard && navigator.permissions && (await navigator.permissions.query({name: 'clipboard-write'})).state === 'granted') {
+            $('#copy-log-button').addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText($('#log-content').textContent);
+                } catch (e) {
+                    throw e;
+                }
+
+                $('#copy-log-button').style.position = 'relative';
+                let copyPopup = document.createElement('div');
+                copyPopup.classList.add('click-popup'); // Piggy-backing on the othe popup here.
+                copyPopup.textContent = 'Copied!';
+                $('#copy-log-button').appendChild(copyPopup);
+                setTimeout(() => { copyPopup.remove(); }, 600);
+            });
+        } else {
+            $('#copy-log-button').disabled = true;
+            $('#copy-log-button').setAttribute('disabled', 'disabled');
+        }
+
+        // Init.
+
+        let urlParams = new URLSearchParams(document.location.search);
+
+        addGreenItems(urlParams.get('extraItems') ? parseInt(urlParams.get('extraItems'), 10) : 4);
+
+        const useSortable = String(urlParams.get('dragEngine')).toLowerCase() === 'sortable';
+
+        const title = `Drag&drop test (${useSortable ? 'Sortable' : 'Omicron'})`;
+        $('#page-title').textContent = document.title = title;
+
+        let urlParams1 = new URLSearchParams(document.location.search);
+        urlParams1.set('dragEngine', 'omicron');
+        $('#go-to-omicron').href = '?' + urlParams1;
+
+        urlParams1.set('dragEngine', 'sortable');
+        $('#go-to-sortable').href = '?' + urlParams1;
+
+        // Force fallback unless explicitly set to 0 or false.
+        sortableForceFallback = !['0', 'false'].includes(urlParams.get('sortableForceFallback'));
+        console.log('sortableForceFallback', sortableForceFallback);
+
+
+        let initTop = initTopContainerOmicron;
+        let initNested = initNestedContainerOmicron;
+        if (useSortable) {
+            initTop = initNested = initContainerSortable;
+        }
+
         for (let containerEl of $$('.drag-container')) {
             if (containerEl.classList.contains('nested')) {
-                OmicronDnd.init(containerEl, {
-                    enterGuardLeft: 0.4,
-                    onFloatElementCreated(floatEl, containerEl, activeEl) {
-                        console.log('onFloatElementCreated (nested)', floatEl, containerEl, activeEl);
-                        floatEl.classList.add('nested-float');
-                    },
-                    floatElScale: 0.9,
-                });
+                initNested(containerEl);
             } else {
-                OmicronDnd.init(containerEl, {
-                    // forbiddenInsertionIndicesFn(c) {
-                    //     if (c === containerEl) {
-                    //         return [4];
-                    //     }
-                    // },
-                    floatElScale: 0.8,
-                    onBeforePreDrag(containerEl, activeEl, event) {
-                        console.log('onBeforePreDrag', containerEl, activeEl, event);
-                    },
-                    onPreDragStart(containerEl, activeEl, event) {
-                        console.log('onPreDragStart', containerEl, activeEl, event);
-                    },
-                    onBeforeDragStart(containerEl, activeEl) {
-                        console.log('onBeforeDragStart', containerEl, activeEl);
-                    },
-                    onFloatElementCreated(floatEl, containerEl, activeEl) {
-                        console.log('onFloatElementCreated', floatEl, containerEl, activeEl);
-                    },
-                    onDragStart(containerEl, activeEl) {
-                        console.log('onDragStart', containerEl, activeEl);
-                    },
-                    onInternalChange(event) {
-                        console.log('onInternalChange', event);
-                    },
-                    onDropToOtherContainer(event) {
-                        console.log('onDropToOtherContainer', event);
-                    },
-                    onDropFromOtherContainer(event) {
-                        console.log('onDropFromOtherContainer', event);
-                    },
-                    onDragFinished(event) {
-                        console.log('onDragFinished', event);
-                    },
-                });
+                initTop(containerEl);
             }
+            // This simulates a client outside the library setting a regular
+            // click handler, which is why it is not packed into any
+            // initContainer functions.
             containerEl.addEventListener('click', deferredItemClickHandler);
         }
     </script>
