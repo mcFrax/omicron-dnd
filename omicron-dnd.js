@@ -138,6 +138,10 @@ function initDragContainer(containerEl, options) {
         options: Object.assign({}, defaultOptions, options || {}),
         domDepth: 0, // To be updated dynamically when added to hoverContainers.
     };
+    toggleListeners(true, document, [
+        ['dragover', cancelIfOmicronActive],
+        ['touchmove', cancelIfOmicronActive],
+    ]);
     toggleListeners(true, containerEl, [
         ['touchdown', anyState_container_TouchDown],
         ['pointerdown', anyState_container_PointerDown],
@@ -188,6 +192,14 @@ function toggleEvents_stateDrag(toggleOn) {
             ['pointermove', stateDrag_window_PointerMove],
             ['pointerup', stateDrag_window_PointerUp],
         ]);
+    }
+}
+function cancelIfOmicronActive(event) {
+    if (!activeEl) {
+        return;
+    }
+    if (event.cancelable) {
+        event.preventDefault();
     }
 }
 function cancelIfCancellable(event) {
