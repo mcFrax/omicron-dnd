@@ -571,6 +571,7 @@ function activateScroller(scroller, horizontal, vertical, speedInput) {
         // the scroll, or maybe just give up caching the rects.
     } else {
         activeScrollers.push({
+            scrollerIndex: scrollers.indexOf(scroller),
             scrollerEl: scroller.el,
             horizontal,
             vertical,
@@ -1077,18 +1078,27 @@ function animationFrame(timestamp) {
             let frameTime = timestamp - lastScrollAnimationTimestamp;
             // Animate. If lastScrollAnimationTimestamp is not set, the animation
             // will start on the next frame.
-            for (let i = 0; i < activeScrollers.length; ++i) {
-                let s = activeScrollers[i];
-                let scrollSpeed = minScrollSpeed + s.speedInput * maxScrollSpeedIncrease;
+            for (let s of activeScrollers) {
+                // Notice the difference between entries in activeScrollers and
+                // scrollers arrays, they are different.
+                const scrollSpeed = minScrollSpeed + s.speedInput * maxScrollSpeedIncrease;
                 if (s.vertical) {
+                    const oldValue = s.scrollerEl.scrollTop;
                     const diff = s.vertical * scrollSpeed * frameTime;
                     s.scrollerEl.scrollTop += diff;
-                    updateScrollerRects(i, diff, 0);
+                    const actualDiff = s.scrollerEl.scrollTop - oldValue;
+                    if (actualDiff !== 0) {
+                        updateScrollerRects(s.scrollerIndex, actualDiff, 0);
+                    }
                 }
                 if (s.horizontal) {
+                    const oldValue = s.scrollerEl.scrollLeft;
                     const diff = s.horizontal * scrollSpeed * frameTime;
                     s.scrollerEl.scrollLeft += diff;
-                    updateScrollerRects(i, 0, diff);
+                    const actualDiff = s.scrollerEl.scrollLeft - oldValue;
+                    if (actualDiff !== 0) {
+                        updateScrollerRects(s.scrollerIndex, 0, actualDiff);
+                    }
                 }
             }
         }
