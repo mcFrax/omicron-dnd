@@ -310,6 +310,10 @@
         let sortableForceFallback = !['0', 'false'].includes(urlParams.get('sortableForceFallback'));
         console.log('sortableForceFallback', sortableForceFallback);
 
+        // Enable autoscroll unless explicitly set to 0 or false.
+        let sortableAutoScroll = !['0', 'false'].includes(urlParams.get('sortableAutoScroll'));
+        console.log('sortableAutoScroll', sortableAutoScroll);
+
         // Dynamically import sortable. That allows to start without sortable
         // if not necessary, and prevents having Sortable's global handler
         // firing when testing Omicron.
@@ -318,7 +322,11 @@
             try {
                 const sortableModule = await import('./sortable.core.esm.js');
                 console.log(sortableModule);
-                Sortable = sortableModule.default;
+                Sortable = sortableModule.Sortable;
+                if (sortableAutoScroll) {
+                    // Enable Sortable's AutoScroll.
+                    Sortable.mount(new sortableModule.AutoScroll());
+                }
             } catch (e) {
                 console.error('Failed to load Sortable.');
                 document.getElementById('no-sortable-error-text').textContent = e.toString();
