@@ -224,65 +224,74 @@
         <div id="log-content"></div>
     </div>
     <script type="module">
-        // Instrumentation, before imports.
+        let urlParams = new URLSearchParams(document.location.search);
 
-        let nextElemId = 0;
-        let knownElems = new Map();
+        const monkeyPatching = urlParams.get('enableTracking') === '1' || urlParams.get('enableTracking') === 'true';
 
-        function getElemId(elem) {
-            let id = knownElems.get(elem);
-            if (id == null) {
-                id = nextElemId++;
-                knownElems.set(elem, id);
-            }
-            return id;
-        }
+        if (!monkeyPatching) {
+            console.log('No instrumentation for console.log and dispatchEvent');
+            document.getElementById('show-log-button').disabled = true;
+        } else {
+            // Instrumentation, before imports.
 
-        function stringifyLogInput(input) {
-            let className = Object.prototype.toString.call(input).slice(8, -1);
-            if (input === document) {
-                return 'document';
-            }
-            if (input === window) {
-                return 'window';
-            }
-            if (input instanceof HTMLElement) {
-                return `${className}<${input.tagName}#${input.id}.${Array.from(input.classList).join('.')}//${getElemId(input)}>`;
-            }
-            if (input instanceof Event) {
-                let extraData = ` x:${input.clientX} y:${input.clientY} trusted:${input.isTrusted}`;
-                if (input instanceof MouseEvent) {
-                    extraData += ` buttons:${input.buttons}`;
+            let nextElemId = 0;
+            let knownElems = new Map();
+
+            function getElemId(elem) {
+                let id = knownElems.get(elem);
+                if (id == null) {
+                    id = nextElemId++;
+                    knownElems.set(elem, id);
                 }
-                if (input instanceof PointerEvent) {
-                    extraData += ` pointerType:${input.pointerType} pointerId:${input.pointerId}`;
-                }
-                if (input instanceof TouchEvent) {
-                    extraData += ` touches:${JSON.stringify(Array.from(input.touches).map(t => ({x: t.clientX, y: t.clientY})))}`;
-                }
-                return `${className}<${input.type}${extraData}>`;
+                return id;
             }
-            try {
-                return JSON.stringify(input);
-            } catch (e) {
-                return String(input);
+
+            function stringifyLogInput(input) {
+                let className = Object.prototype.toString.call(input).slice(8, -1);
+                if (input === document) {
+                    return 'document';
+                }
+                if (input === window) {
+                    return 'window';
+                }
+                if (input instanceof HTMLElement) {
+                    return `${className}<${input.tagName}#${input.id}.${Array.from(input.classList).join('.')}//${getElemId(input)}>`;
+                }
+                if (input instanceof Event) {
+                    let extraData = ` x:${input.clientX} y:${input.clientY} trusted:${input.isTrusted}`;
+                    if (input instanceof MouseEvent) {
+                        extraData += ` buttons:${input.buttons}`;
+                    }
+                    if (input instanceof PointerEvent) {
+                        extraData += ` pointerType:${input.pointerType} pointerId:${input.pointerId}`;
+                    }
+                    if (input instanceof TouchEvent) {
+                        extraData += ` touches:${JSON.stringify(Array.from(input.touches).map(t => ({x: t.clientX, y: t.clientY})))}`;
+                    }
+                    return `${className}<${input.type}${extraData}>`;
+                }
+                try {
+                    return JSON.stringify(input);
+                } catch (e) {
+                    return String(input);
+                }
             }
+
+            window.myLogLines = [];
+            const originalLog = console.log;
+            console.log = (...args) => {
+                originalLog.call(console, ...args);
+                window.myLogLines.push(args.map(stringifyLogInput).join(' '));
+            };
+
+            const originalDispatchEvent = HTMLElement.prototype.dispatchEvent;
+            HTMLElement.prototype.dispatchEvent = function (e, ...args) {
+                console.log('DISPATCH', e, ...args);
+                originalLog.call(this, e, ...args);
+            }
+
+            console.log('console.log and dispatchEvent monkey patched.');
         }
-
-        window.myLogLines = [];
-        const originalLog = console.log;
-        console.log = (...args) => {
-            originalLog.call(console, ...args);
-            window.myLogLines.push(args.map(stringifyLogInput).join(' '));
-        };
-
-        const originalDispatchEvent = HTMLElement.prototype.dispatchEvent;
-        HTMLElement.prototype.dispatchEvent = function (e, ...args) {
-            console.log('DISPATCH', e, ...args);
-            originalLog.call(this, e, ...args);
-        }
-
-        console.log('console.log and dispatchEvent monkey patched.');
     </script>
     <script type="module" async>
         import OmicronDnd from './omicron-dnd.js';
