@@ -193,6 +193,9 @@ function toggleEvents_stateDrag(toggleOn) {
             ['pointerup', stateDrag_window_PointerUp],
         ]);
     }
+    toggleListeners(toggleOn, document, [
+        ['selectstart', cancelIfCancellable],
+    ]);
 }
 function cancelIfOmicronActive(event) {
     if (!activeEl) {
