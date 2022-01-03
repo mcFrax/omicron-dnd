@@ -328,7 +328,8 @@ function toggleEvents_statePreDrag(toggleOn) {
     } else {
         toggleListeners(toggleOn, document, [
             ['pointermove', statePreDrag_window_PointerMove],
-            ['pointerup', statePreDrag_window_PointerUp],
+            ['pointerup', statePreDrag_window_PointerUpOrCancel],
+            ['pointercancel', statePreDrag_window_PointerUpOrCancel],
         ]);
     }
     if (touchDrag && toggleOn) {
@@ -357,6 +358,7 @@ function toggleEvents_stateDrag(toggleOn) {
         toggleListeners(toggleOn, document, [
             ['pointermove', stateDrag_window_PointerMove],
             ['pointerup', stateDrag_window_PointerUp],
+            ['pointercancel', stateDrag_window_PointerCancel],
         ]);
     }
     toggleListeners(toggleOn, document, [
@@ -603,7 +605,7 @@ function statePreDrag_window_PointerMove(event) {
         startDrag();
     }
 }
-function statePreDrag_window_PointerUp(event) {
+function statePreDrag_window_PointerUpOrCancel(event) {
     if (event.pointerId !== pointerId) {
         return;
     }
@@ -967,6 +969,9 @@ function stateDrag_window_TouchEnd(event) {
     dragEndedWithRelease();
     event.preventDefault();
     event.stopPropagation();
+}
+function stateDrag_window_PointerCancel(event) {
+    exitDrag(false);
 }
 function stateDrag_window_PointerUp(event) {
     if (event.pointerId !== pointerId) {
