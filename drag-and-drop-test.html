@@ -313,7 +313,7 @@
     </script>
     <script type="module">
         import OmicronDnd from './omicron-dnd.js';
-    // Top-level async doesn't work in (older?) Safari, so we wrap everything
+    // Top-level async doesn't work in Safari <= 14, so we wrap everything
     // in an async function instead.
     (async () => {
 
