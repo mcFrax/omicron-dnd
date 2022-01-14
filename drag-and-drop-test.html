@@ -19,6 +19,9 @@
             bottom: 0;
             display: flex;
             flex-direction: column;
+            /* user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none; */
         }
         .horizontal-layout {
             display: flex;
@@ -36,6 +39,10 @@
             position: relative;
             overflow: visible; /* for the placeholder to be visible when hanging from the bottom */
             padding: 10px;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
         }
         .scroll-container>.drag-container {
             min-height: 60px;
@@ -61,6 +68,7 @@
             text-align: center;
             user-select: none;
             -webkit-user-select: none;
+            -webkit-touch-callout: none;
             cursor: pointer;
         }
         .nested .card,
@@ -120,6 +128,7 @@
             padding: 2vmin;
             user-select: none;
             -webkit-user-select: none;
+            -webkit-touch-callout: none;
         }
         #log-content {
             flex: 1;
@@ -132,6 +141,7 @@
             padding: 1vmin;
             user-select: text;
             -webkit-user-select: text;
+            -webkit-touch-callout: default;
         }
         .failure-dialog {
             display: none;
@@ -227,6 +237,11 @@
         <div id="log-content"></div>
     </div>
     <script type="module">
+        window.onerror = function (msg, url, line) {
+            alert("Message : " + msg );
+            alert("url : " + url );
+            alert("Line number : " + line );
+        }
         let urlParams = new URLSearchParams(document.location.search);
 
         const monkeyPatching = urlParams.get('enableTracking') === '1' || urlParams.get('enableTracking') === 'true';
@@ -296,11 +311,15 @@
             console.log('console.log and dispatchEvent monkey patched.');
         }
     </script>
-    <script type="module" async>
+    <script type="module">
         import OmicronDnd from './omicron-dnd.js';
+    // Top-level async doesn't work in (older?) Safari, so we wrap everything
+    // in an async function instead.
+    (async () => {
 
         let $ = (s) => document.querySelector(s);
         let $$ = (s) => Array.from(document.querySelectorAll(s));
+
 
         // Parse url params.
 
@@ -332,7 +351,8 @@
         let Sortable;
         if (useSortable) {
             try {
-                const sortableModule = await import('./sortable.core.esm.js');
+                // const sortableModule = await import('./sortable.core.esm.js');
+                const sortableModule = null;
                 console.log(sortableModule);
                 Sortable = sortableModule.Sortable;
                 if (sortableAutoScroll) {
@@ -491,6 +511,7 @@
             // initContainer functions.
             containerEl.addEventListener('click', deferredItemClickHandler);
         }
+    })();
     </script>
     <script>
         if (location.protocol === 'file:') {
