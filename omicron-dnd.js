@@ -357,7 +357,7 @@ function toggleEvents_statePreDrag(toggleOn) {
     if (touchDrag) {
         toggleListeners(toggleOn, document, [
             ['touchdown', statePreDrag_window_TouchDown],
-            // ['touchmove', statePreDrag_window_TouchMove],
+            ['touchmove', statePreDrag_window_TouchMove],
             ['touchend', statePreDrag_window_TouchEndOrCancel],
             ['touchcancel', statePreDrag_window_TouchEndOrCancel],
             ['pointermove', cancelIfCancellable],
@@ -408,7 +408,7 @@ function stopEventPropagation(event) {
     event.stopPropagation();
 }
 function cancelIfOmicronActive(event) {
-    if (!activeEl) {
+    if (!activeEl || (touchDrag && preDragTimeoutId)) {
         return;
     }
     if (event.cancelable) {
@@ -417,6 +417,7 @@ function cancelIfOmicronActive(event) {
 }
 function cancelIfCancellable(event) {
     if (event.cancelable) {
+    console.log('cancelIfCancellable preventDefault', event.type);
         event.preventDefault();
     }
 }
@@ -530,6 +531,7 @@ function startPreDrag(event, evPlace) {
     // Only stop propagation after deciding that something was indeed grabbed.
     // That allows the nested container to be dragged by contents when using
     // handle/filter, or just being grabbed by the padding/empty area.
+    console.log('stopPropagation', event);
     event.stopPropagation();
 
     toEl = fromEl = containerData.el;
@@ -749,6 +751,7 @@ function updateOnMove(evtPoint) {
     for (let i = 0; i < hoverContainersByDepth.length; ++i) {
         if (hoverContainersByDepth[i].domDepth <= toElDomDepth) {
             // Not looking at toEl or ancestors.
+            console.log('Not looking at toEl or ancestors?')
             break;
         }
         if (maybeEnterContainer(hoverContainersByDepth[i], evtPoint)) {
@@ -1046,6 +1049,7 @@ function stateDrag_window_TouchCancel(event) {
 }
 function stateDrag_window_TouchEnd(event) {
     dragEndedWithRelease();
+    console.log('TouchEnd preventDefault');
     event.preventDefault();
     event.stopPropagation();
 }
@@ -1060,6 +1064,7 @@ function stateDrag_window_PointerUp(event) {
 }
 
 function dragEndedWithRelease() {
+console.log('DUPA');
     // We can't really prevent the browser for generating a click, but we
     // can capture it.
     document.addEventListener('click', preventNextClick, true);
@@ -1076,6 +1081,7 @@ function dragEndedWithRelease() {
 }
 
 function preventNextClick(event) {
+    console.log('preventNextClick preventDefault');
     event.stopPropagation();
     event.preventDefault();
     document.removeEventListener('click', preventNextClick, true);
@@ -1085,6 +1091,7 @@ function removeClickBlocker() {
 }
 
 function exitDrag(execSort) {
+    console.log('exitDrag');
     let animBackFromFloat = Boolean(floatEl);
     if (floatEl) {
         floatEl.remove();  // Removing this element now saves some special casing.
@@ -1229,12 +1236,14 @@ function exitDrag(execSort) {
 }
 
 function anyState_container_PointerEnter(event) {
+    console.log('pointerenter', event.currentTarget);
     let containerData = event.currentTarget[expando];
     containerData.domDepth = getDomDepth(event.currentTarget);
     hoverContainers.set(event.currentTarget, containerData);
     if (hoverContainersByDepth.indexOf(containerData) === -1) {
         hoverContainersByDepth.push(containerData);
         hoverContainersByDepth.sort(cmpDomDepth);
+        console.log('container added', hoverContainersByDepth.length, hoverContainersByDepth[0].el);
     }
 
     if (!fromEl) {
@@ -1250,6 +1259,7 @@ function anyState_container_PointerEnter(event) {
 }
 
 function anyState_container_PointerLeave(event) {
+    console.log('pointerleave', event.currentTarget);
     let containerData = event.currentTarget[expando];
     hoverContainers.delete(event.currentTarget);
     let delIdx;
@@ -1258,36 +1268,45 @@ function anyState_container_PointerLeave(event) {
     }
 
     if (event.currentTarget !== toEl) {
+        console.log('pointerleave "Not relevant"');
         return; // Not relevant.
     }
 
-    if (event.buttons === 0) {
-        // This PointerLeave event was caused by releasing the touch or
-        // button. Don't call leaveContainer, the subsequent PointerUp
-        // or TouchEnd will handle the end of the drag instead.
-        return;
-    }
-
-    leaveContainer();
-
-    // mousemove handler will figure the container to enter.
-    // TODO: if it gets glitchy, call the mousemove handler here directly.
+    // PointerLeave event might have been caused by releasing the touch or
+    // button, however, we can't really tell. event.buttons === 0 works in
+    // most browsers, but not iOS Safari (at least not in 14).
+    // We will instead wait for other related events to dispatch. In case
+    // this is the pointerup case, the drag will be over by the time the timer
+    // executes.
+    setTimeout(() => {
+        if (activeEl) {
+            leaveContainer();
+            // mousemove handler will figure the container to enter.
+            // TODO: if it gets glitchy, call the mousemove handler here directly.
+        }
+    }, 0);
 }
 
 function maybeEnterContainer(containerData, evPlace) {
+    console.log('maybeEnterContainer');
     let cData = containerData;
     let rect = cData.el.getClientRects()[0];
     if (!rect) {
+        console.log('maybeEnterContainer: !rect');
         return false;
     }
     if (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
             xLast <= rect.right - rect.width * cData.options.enterGuardRight - cData.options.enterGuardRightPx) {
+        console.log('maybeEnterContainer: in rect');
         let insertionIndex = findUpdatedNewIndex(evPlace, cData.el);
         if (!isForbiddenIndex(cData.el, insertionIndex)) {
             enterContainer(cData.el, insertionIndex);
             return true;
         }
+        console.log('maybeEnterContainer: forbidden index');
+        return false;
     }
+    console.log('maybeEnterContainer: not in rect');
     return false;
 }
 
