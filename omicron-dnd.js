@@ -243,6 +243,12 @@ const defaultOptions = {
     // where the pointer is located on the original element.
     floatElScale: 1,
 
+    // Argument to pass to navigator.vibrate when the drag is activated.
+    // Set to 0 to disable.
+    // The value is the length of vibration in milliseconds (it may be also
+    // a pattern, but it really doesn't make sense with drag and drop).
+    dragStartVibration: 25,
+
     // onBeforePreDrag: Called just before preDrag starts.
     // Return explicit `false` to cancel the drag.
     // onBeforePreDrag(containerEl, activeEl, event)
@@ -589,6 +595,15 @@ function startDrag() {
     }
     if (typeof containerOptions.onContainerEntered === 'function') {
         containerOptions.onContainerEntered(fromEl, activeEl);
+    }
+
+    if (navigator.vibrate && containerData.options.dragStartVibration) {
+        // Unfortunately doesn't work if this drag is the first user interaction
+        // with the page. This is due to Chrome being a little bit too strict
+        // in requiring previous user interaction with the page before
+        // activating Vibration API.
+        // See https://stackoverflow.com/a/46189638/2468549.
+        navigator.vibrate(containerData.options.dragStartVibration);
     }
 }
 function statePreDrag_window_TouchDown(event) {
