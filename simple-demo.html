@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimal-ui" />
+    <title>Drag&drop test</title>
+    <style>
+        .horizontal-layout {
+            display: flex;
+            height: 80vh;
+            flex-direction: row;
+            align-items: stretch;
+            overflow-x: auto;
+        }
+        .scroll-container {
+            position: relative;
+            width: 33vw;
+            min-width: 300px;
+            overflow: hidden scroll;
+        }
+        .card {
+            position: relative; /* for z-index to work */
+            z-index: 2; /* above placeholder */
+            padding: 10px;
+            margin: 8px;
+            font-size: 2rem;
+            font-weight: bold;
+            font-family: Arial, Helvetica, sans-serif;
+            text-align: center;
+            user-select: none;
+            cursor: pointer;
+        }
+        .blue {
+            background: cornflowerblue;
+        }
+        .purple {
+            background: mediumpurple;
+        }
+        .pink {
+            background: deeppink;
+        }
+        .red {
+            background: tomato;
+        }
+        .green {
+            background: lightgreen;
+        }
+        .fuchsia {
+            background: fuchsia;
+        }
+        .black {
+            background: darkslategray;
+            color: whitesmoke;
+        }
+        .dark {
+            background: darkgray;
+            color: whitesmoke;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="page-title">Drag&drop test</h1>
+    <div class="horizontal-layout">
+        <div class="scroll-container">
+            <div class="drag-container">
+                <div class="card blue">
+                    ITEM
+                </div>
+                <div class="card purple">
+                    ITEM
+                </div>
+                <div class="card pink">
+                    ITEM
+                </div>
+                <div class="card red">
+                    ITEM
+                </div>
+            </div>
+        </div>
+        <div class="scroll-container">
+            <div class="drag-container">
+                <div class="card black">
+                    ITEM
+                </div>
+                <div class="card dark">
+                    ITEM
+                </div>
+            </div>
+        </div>
+        <div class="scroll-container righter">
+            <div class="drag-container">
+            </div>
+        </div>
+    </div>
+    <script type="module" async>
+        import OmicronDnd from './omicron-dnd.js';
+
+        let $ = (s) => document.querySelector(s);
+        let $$ = (s) => Array.from(document.querySelectorAll(s));
+
+        for (let containerEl of $$('.drag-container')) {
+            OmicronDnd.init(containerEl);
+        }
+    </script>
+</body>
+</html>
+
