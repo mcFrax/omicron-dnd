@@ -370,7 +370,7 @@ function toggleEvents_stateDrag(toggleOn) {
     ]);
 }
 function cancelIfOmicronActive(event) {
-    if (!activeEl) {
+    if (!activeEl || (touchDrag && preDragTimeoutId)) {
         return;
     }
     if (event.cancelable) {
