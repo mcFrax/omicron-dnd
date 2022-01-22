@@ -281,10 +281,35 @@
             }
 
             window.myLogLines = [];
-            const originalLog = console.log;
-            console.log = (...args) => {
-                originalLog.call(console, ...args);
-                window.myLogLines.push(args.map(stringifyLogInput).join(' '));
+            const originalConsole = window.console;
+            const startTime = Date.now();
+            function timePrefix() {
+                return ((Date.now() - startTime) / 1000).toFixed(3).padStart(7, '0') + ':';
+            }
+            window.console = {
+                log(...args) {
+                    originalConsole.log(...args);
+                    window.myLogLines.push(timePrefix() + 'LOG: ' + args.map(stringifyLogInput).join(' '));
+                },
+                debug(...args) {
+                    originalConsole.debug(...args);
+                    window.myLogLines.push(timePrefix() + 'DBG: ' + args.map(stringifyLogInput).join(' '));
+                },
+                warn(...args) {
+                    originalConsole.debug(...args);
+                    window.myLogLines.push(timePrefix() + 'WRN: ' + args.map(stringifyLogInput).join(' '));
+                },
+                error(...args) {
+                    originalConsole.debug(...args);
+                    window.myLogLines.push(timePrefix() + 'ERR: ' + args.map(stringifyLogInput).join(' '));
+                },
+                info(...args) {
+                    originalConsole.debug(...args);
+                    window.myLogLines.push(timePrefix() + 'INF: ' + args.map(stringifyLogInput).join(' '));
+                },
+                trace(...args) {
+                    originalConsole.trace(...args);
+                },
             };
 
             const originalDispatchEvent = HTMLElement.prototype.dispatchEvent;
