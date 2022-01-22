@@ -296,11 +296,15 @@
             console.log('console.log and dispatchEvent monkey patched.');
         }
     </script>
-    <script type="module" async>
+    <script type="module">
         import OmicronDnd from './omicron-dnd.js';
+    // Top-level async doesn't work in Safari <= 14, so we wrap everything
+    // in an async function instead.
+    (async () => {
 
         let $ = (s) => document.querySelector(s);
         let $$ = (s) => Array.from(document.querySelectorAll(s));
+
 
         // Parse url params.
 
@@ -491,6 +495,7 @@
             // initContainer functions.
             containerEl.addEventListener('click', deferredItemClickHandler);
         }
+    })();
     </script>
     <script>
         if (location.protocol === 'file:') {
