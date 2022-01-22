@@ -10,6 +10,9 @@ let pointerId = null;
 // Cached overscroll-behavior values to be reverted after drag.
 let htmlOvescrollBehavior;
 let bodyOvescrollBehavior;
+let bodyUserSelect;
+let bodyWebkitUserSelect;
+let bodyWebkitTouchCallout;
 // Whether the current drag is triggered by touch.
 // Set in pointerdown and not reset after the drag.
 let touchDrag = false;
@@ -503,6 +506,14 @@ function startPreDrag(event, evPlace) {
     if (typeof containerOptions.onPreDragStart === 'function') {
         containerOptions.onPreDragStart(fromEl, activeEl, event);
     }
+
+    bodyUserSelect = document.body.style.userSelect;
+    bodyWebkitUserSelect = document.body.style.webkitUserSelect;
+    bodyWebkitTouchCallout = document.body.style.webkitTouchCallout;
+    document.body.style.userSelect = 'none';
+    document.body.style.webkitUserSelect = 'none';
+    document.body.style.webkitTouchCallout = 'none';
+
     return true;
 }
 
@@ -1103,8 +1114,14 @@ function exitDrag(execSort) {
     toggleEvents_stateDrag(false);
 
     // Revert the original overscroll behavior.
+    // TODO: Don't, if we didn't store it first.
     document.documentElement.style.overscrollBehavior = htmlOvescrollBehavior;
     document.body.style.overscrollBehavior = bodyOvescrollBehavior;
+
+    // Revert user-select on document.body.
+    document.body.style.userSelect = bodyUserSelect;
+    document.body.style.webkitUserSelect = bodyWebkitUserSelect;
+    document.body.style.webkitTouchCallout = bodyWebkitTouchCallout;
 
     pointerId = null;
     activeEl = null;
