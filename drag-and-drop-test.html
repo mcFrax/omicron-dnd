@@ -322,14 +322,12 @@
         }
     </script>
     <script type="module">
-        import OmicronDnd from './omicron-dnd.js';
     // Top-level async doesn't work in Safari <= 14, so we wrap everything
     // in an async function instead.
     (async () => {
 
         let $ = (s) => document.querySelector(s);
         let $$ = (s) => Array.from(document.querySelectorAll(s));
-
 
         // Parse url params.
 
@@ -355,14 +353,15 @@
         let sortableAutoScroll = !['0', 'false'].includes(urlParams.get('sortableAutoScroll'));
         console.log('sortableAutoScroll', sortableAutoScroll);
 
-        // Dynamically import sortable. That allows to start without sortable
-        // if not necessary, and prevents having Sortable's global handler
-        // firing when testing Omicron.
+        // Dynamically import drag and drop library. That allows to start
+        // without sortable if not necessary, and prevents having Sortable's
+        // global handler firing when testing Omicron.
+        // This also allows to employ cache-busting for Omicron.
         let Sortable;
+        let OmicronDnd;
         if (useSortable) {
             try {
                 const sortableModule = await import('./sortable.core.esm.js');
-                console.log(sortableModule);
                 Sortable = sortableModule.Sortable;
                 if (sortableAutoScroll) {
                     // Enable Sortable's AutoScroll.
@@ -372,6 +371,18 @@
                 console.error('Failed to load Sortable.');
                 document.getElementById('no-sortable-error-text').textContent = e.toString();
                 document.getElementById('no-sortable-error-dialog').style.display = 'block';
+            }
+        } else {
+            const enableCacheBusting = ['1', 'true'].includes(urlParams.get('jsCacheBusting'));
+            const urlSuffix =
+                    enableCacheBusting ?
+                        '?cacheBusting=' + Math.round(Math.random() * 0xFFFFFFF).toString(36) :
+                        '';
+            try {
+                const omicronModule = await import('./omicron-dnd.js' + urlSuffix);
+                OmicronDnd = omicronModule.default;
+            } catch (e) {
+                console.error('Failed to load Omicron.');
             }
         }
 
