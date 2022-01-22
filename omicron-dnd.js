@@ -243,6 +243,11 @@ const defaultOptions = {
     // where the pointer is located on the original element.
     floatElScale: 1,
 
+    // Chrome on Android will highlight every element that you tap with mild
+    // blue color. That is irrelevant and distracting when using drag and drop,
+    // so we turn this off by default, but you can disable that feature.
+    setWebkitTapHighlightColorTransparent: true,
+
     // Argument to pass to navigator.vibrate when the drag is activated.
     // Set to 0 to disable.
     // The value is the length of vibration in milliseconds (it may be also
@@ -328,6 +333,10 @@ function initDragContainer(containerEl, options) {
         ['pointerleave', anyState_container_PointerLeave],
     ]);
     containerEl[expando] = containerData;
+    if (containerData.options.setWebkitTapHighlightColorTransparent &&
+            ('webkitTapHighlightColor' in containerEl.style)) {
+        containerEl.style.webkitTapHighlightColor = 'transparent';
+    }
 }
 function toggleEvents_statePreDrag(toggleOn) {
     if (touchDrag) {
