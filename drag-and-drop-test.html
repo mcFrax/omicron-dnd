@@ -265,10 +265,10 @@
                     if (input instanceof MouseEvent) {
                         extraData += ` buttons:${input.buttons}`;
                     }
-                    if (input instanceof PointerEvent) {
+                    if (window.PointerEvent && input instanceof window.PointerEvent) {
                         extraData += ` pointerType:${input.pointerType} pointerId:${input.pointerId}`;
                     }
-                    if (input instanceof TouchEvent) {
+                    if (window.TouchEvent && input instanceof window.TouchEvent) {
                         extraData += ` touches:${JSON.stringify(Array.from(input.touches).map(t => ({x: t.clientX, y: t.clientY})))}`;
                     }
                     return `${className}<${input.type}${extraData}>`;
@@ -489,7 +489,32 @@
             $('#log-container').style.display = 'none';
         });
 
-        if (navigator.clipboard && navigator.permissions && (await navigator.permissions.query({name: 'clipboard-write'})).state === 'granted') {
+        async function hasClipboardPermission() {
+            if (!navigator.clipboard) {
+                return false;
+            }
+            if (!navigator.permissions) {
+                // Clipboard object exists but no way to check the permission -
+                // assume it's granted.
+                return true;
+            }
+            try {
+                const permission =
+                    await navigator.permissions.query({
+                        name: 'clipboard-write',
+                    });
+                return permission.state === 'granted';
+            } catch (e) {
+                // Assume that Permissions API doesn't support clipboard, but
+                // the permission is actually granted. That may not be the case,
+                // but we can't really tell anyway.
+                // FF will throw, because its Permissions API doesn't support
+                // clipboard-write.
+                return true;
+            }
+        }
+
+        if (await hasClipboardPermission()) {
             $('#copy-log-button').addEventListener('click', async () => {
                 try {
                     await navigator.clipboard.writeText($('#log-content').textContent);
