@@ -1178,17 +1178,19 @@ function anyState_container_PointerLeave(event) {
         return; // Not relevant.
     }
 
-    if (event.buttons === 0) {
-        // This PointerLeave event was caused by releasing the touch or
-        // button. Don't call leaveContainer, the subsequent PointerUp
-        // or TouchEnd will handle the end of the drag instead.
-        return;
-    }
-
-    leaveContainer();
-
-    // mousemove handler will figure the container to enter.
-    // TODO: if it gets glitchy, call the mousemove handler here directly.
+    // PointerLeave event might have been caused by releasing the touch or
+    // button, however, we can't really tell. event.buttons === 0 works in
+    // most browsers, but not iOS Safari (at least not in 14).
+    // We will instead wait for other related events to dispatch. In case
+    // this is the pointerup case, the drag will be over by the time the timer
+    // executes.
+    setTimeout(() => {
+        if (activeEl) {
+            leaveContainer();
+            // mousemove handler will figure the container to enter.
+            // TODO: if it gets glitchy, call the mousemove handler here directly.
+        }
+    }, 0);
 }
 
 function maybeEnterContainer(containerData, evPlace) {
