@@ -2,7 +2,7 @@
 
 Omicron is a fast JavaScript drag-and-drop library for desktop and mobile browsers.
 
-Demo: http://eytlohe.cluster029.hosting.ovh.net/omicron/drag-and-drop-test.html
+Demo: https://mcfrax.github.io/omicron-dnd/drag-and-drop-test.html
 
 
 ## Features
