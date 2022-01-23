@@ -2,7 +2,9 @@
 
 Omicron is a fast JavaScript drag-and-drop library for desktop and mobile browsers.
 
-Demo: https://mcfrax.github.io/omicron-dnd/drag-and-drop-test.html
+Basic usage: [Demo](https://mcfrax.github.io/omicron-dnd/basic-example.html) (see code in [JS Fiddle](https://jsfiddle.net/mcFrax/cpjm34zb/2/))
+
+Test page: https://mcfrax.github.io/omicron-dnd/basic-example.html
 
 
 ## Features
@@ -13,28 +15,21 @@ Demo: https://mcfrax.github.io/omicron-dnd/drag-and-drop-test.html
 * supports nested containers
 * CSS animation for moving items
 * smooth autoscroll
-* no framework required
+* no dependencies
 
 
-## Usage
+## Basic usage
 
-```html
-<html>
-  <body>
-    <ul id="list">
-      <li>item 1</li>
-      <li>item 2</li>
-      <li>item 3</li>
-    </ul>
-  </body>
-  <script type="module">
-    import OmicronDnd from './omicron-dnd.js';
-    var container = document.getElementById('list');
-    OmicronDnd.init(container);
-  </script>
-</html>
+```js
+  import OmicronDnd from './omicron-dnd.js';
+
+  ...
+
+  const containerElement = document.getElementById('drag-container');
+  OmicronDnd.init(container);
 ```
 
+[JS Fiddle](https://jsfiddle.net/mcFrax/cpjm34zb/2/)
 
 ## Configuration & API
 
@@ -73,5 +68,5 @@ OmicronDnd.init(container, {
 
 ## Why "Omicron"?
 
-This project was started when Franek, its main author, was sitting at home with
-Covid-19 (most probably Omicron variant, hence the name).
+I started this project when I was sick with Covid-19 in December 2021.
+It probably wasn't Omicron variant, but I liked the sound of the name.
