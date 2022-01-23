@@ -337,6 +337,11 @@ function initDragContainer(containerEl, options) {
             ('webkitTapHighlightColor' in containerEl.style)) {
         containerEl.style.webkitTapHighlightColor = 'transparent';
     }
+    if (getComputedStyle(containerEl).position === 'static') {
+        // The container needs to be positioned to work correctly
+        // with absolutely positioned placeholder.
+        containerEl.style.position = 'relative';
+    }
 }
 function toggleEvents_statePreDrag(toggleOn) {
     if (touchDrag) {
