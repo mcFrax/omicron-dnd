@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimal-ui" />
+    <title>Omicron-dnd basic example</title>
+    <style>
+      ul {
+        display: inline-block;
+        padding: 8px;
+        margin: 4px;
+        border: 4px solid maroon;
+      }
+
+      li {
+        display: block;
+        font-size: 2rem;
+        margin: 4px;
+        padding: 4px;
+        background: white;
+        border: 6px solid limegreen;
+        border-radius: 1rem;
+        cursor: pointer;
+      }
+
+      .row {
+        display: inline-flex;
+        flex-direction: row;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <ul>
+        <li>Drag items immediately with mouse 🖱️</li>
+        <li>Or tap and hold 👉⌛ when using touch</li>
+        <li>This way scroll on mobile still works 📱</li>
+        <li>It's that simple! 😃👍</li>
+      </ul>
+
+      <ul>
+        <li>You can drag elements between multiple containers</li>
+      </ul>
+
+      <ul>
+        <li>Omicron minimizes the DOM modification during drag</li>
+        <li>CSS transforms give us graphics acceleration ⚙️</li>
+        <li>And blazing performance 🔥🚀</li>
+      </ul>
+    </div>
+  </body>
+  <script type="module">
+    import OmicronDnd from './omicron-dnd.js';
+    for (const ulElem of document.getElementsByTagName('ul')) {
+      OmicronDnd.init(ulElem);
+    }
+  </script>
+</html>
