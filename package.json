@@ -6,6 +6,7 @@
   "license": "MIT",
   "repository": "mcFrax/omicron-dnd",
   "main": "omicron-dnd.js",
+  "types": "omicron-dnd.d.ts",
   "keywords": [
     "sortable",
     "reorder",
