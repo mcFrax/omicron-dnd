@@ -334,7 +334,7 @@ class ContainerOptions {
     onDragFinished: ((dragEndEvent: DragEndEvent) => void)|null = null;
 };
 
-function initDragContainer(containerEl: HTMLElement, options: object) {
+function initDragContainer(containerEl: HTMLElement, options: Partial<ContainerOptions>) {
     if ((containerEl as any)[expando]) {
         return;  // Ignore repeated calls.
     }
