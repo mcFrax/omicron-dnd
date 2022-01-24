@@ -10,5 +10,8 @@
     "sortable",
     "reorder",
     "drag"
-  ]
+  ],
+  "devDependencies": {
+    "typescript": "^4.5.5"
+  }
 }
