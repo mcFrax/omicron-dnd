@@ -143,7 +143,7 @@ interface ScrollerRecord {
     snap: boolean,
     snapCooldown: boolean,
 }
-let scrollers: ScrollerRecord[];
+let scrollers: ScrollerRecord[] = [];
 // Cache of the scroller-data records used by scrollers.
 // Reset between the drags.
 // Map<HTMLElement => scroller record>
@@ -162,7 +162,7 @@ interface ActiveScroller {
     vertical: number,
     speedInput: number,
 }
-let activeScrollers: ActiveScroller[];
+let activeScrollers: ActiveScroller[] = [];
 
 // Last timestamp (as passed to requestAnimationFrame callback) when
 // active scrollers animation/scroll positions were updated.
@@ -178,7 +178,7 @@ let lastScrollAnimationTimestamp: DOMTimeStamp|null = null;
 // The Anim class is written to support animating several elements in parallel,
 // however it is not used that way and most likely it will eventually be
 // converted to only handle a single element, but this is not guaranted.
-let anims: Anim[];
+let anims: Anim[] = [];
 // Anim elements from Anim, but keyed by the animated elements.
 // Theoretically can contain more entries than anims, if we have Anim handling
 // several elements in parallel, but this feature is not currently used.
@@ -460,7 +460,7 @@ function anyState_container_PointerDown(event: PointerEvent) {
 // Returns true if preDrag actually started.
 function startPreDrag(event: MouseEvent|PointerEvent|TouchEvent, evPlace: EvPlace) {
     const containerEl = event.currentTarget as HTMLElement;
-    const containerData = (containerEl as any)[expando] as ContainerData|undefined;
+    const containerData = (containerEl as any)[expando] as ContainerData;
     const containerOptions = containerData.options;
     activeEl = getItemFromContainerEvent(event, containerData.options);
     if (!activeEl) {
@@ -518,12 +518,11 @@ function startPreDrag(event: MouseEvent|PointerEvent|TouchEvent, evPlace: EvPlac
 }
 
 function startDrag() {
-    activeEl = activeEl as HTMLElement;
     if (preDragTimeoutId) {
         clearTimeout(preDragTimeoutId);
         preDragTimeoutId = 0;
     }
-    let containerData = (fromEl as any)[expando] as ContainerData|undefined;
+    let containerData = (fromEl as any)[expando] as ContainerData;
     const containerOptions = containerData.options;
     if (typeof containerOptions.onBeforeDragStart === 'function') {
         containerOptions.onBeforeDragStart(fromEl, activeEl);
@@ -1583,7 +1582,7 @@ class Anim {
             elems: HTMLElement[],
             targetYTranslation: number,
             durationMs: number,
-            startYTranslation: number|undefined=undefined) {
+            startYTranslation: number|null=null) {
         // How the actual, visible position differs from offsetTop.
         if (startYTranslation === null) {
             // TODO: Group the elements with the same initial translation.
@@ -1657,8 +1656,9 @@ class Anim {
             this.endTime = timestamp + this.durationMs;
             return true;  // Do nothing
         }
+        // Note: startTime is defined, so endTime is, too.
         let advancementRate =
-            timestamp >= this.endTime ? 1 : (timestamp - this.startTime) / this.durationMs;
+            timestamp >= (this.endTime as number) ? 1 : (timestamp - this.startTime) / this.durationMs;
         let currentYTranslation =
             advancementRate * this.targetYTranslation + (1 - advancementRate) * this.startYTranslation;
         let transformString = `translateY(${currentYTranslation}px)`;
@@ -1682,7 +1682,7 @@ class Anim {
     }
 }
 
-function getItemFromContainerEvent(event: Event, options: ContainerOptions): HTMLElement {
+function getItemFromContainerEvent(event: Event, options: ContainerOptions): HTMLElement|null {
     let containerEl = event.currentTarget as HTMLElement;
     let result = null;
     let handleFound = false;

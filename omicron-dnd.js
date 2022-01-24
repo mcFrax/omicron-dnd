@@ -100,12 +100,12 @@ let yDirection = -1;
 // This is the id value returned by setTimeout.
 // Always 0 if the timeout is not set.
 let preDragTimeoutId = 0;
-let scrollers;
+let scrollers = [];
 // Cache of the scroller-data records used by scrollers.
 // Reset between the drags.
 // Map<HTMLElement => scroller record>
 let knownScrollers = new Map();
-let activeScrollers;
+let activeScrollers = [];
 // Last timestamp (as passed to requestAnimationFrame callback) when
 // active scrollers animation/scroll positions were updated.
 // This is the base for calculating the scroll distance for the current frame.
@@ -119,7 +119,7 @@ let lastScrollAnimationTimestamp = null;
 // The Anim class is written to support animating several elements in parallel,
 // however it is not used that way and most likely it will eventually be
 // converted to only handle a single element, but this is not guaranted.
-let anims;
+let anims = [];
 // Anim elements from Anim, but keyed by the animated elements.
 // Theoretically can contain more entries than anims, if we have Anim handling
 // several elements in parallel, but this feature is not currently used.
@@ -429,7 +429,6 @@ function startPreDrag(event, evPlace) {
     return true;
 }
 function startDrag() {
-    activeEl = activeEl;
     if (preDragTimeoutId) {
         clearTimeout(preDragTimeoutId);
         preDragTimeoutId = 0;
@@ -1403,7 +1402,7 @@ class Anim {
         this.startTime = null; // Will be filled in in the animation frame.
         this.endTime = null;
     }
-    static start(parentEl, elems, targetYTranslation, durationMs, startYTranslation = undefined) {
+    static start(parentEl, elems, targetYTranslation, durationMs, startYTranslation = null) {
         // How the actual, visible position differs from offsetTop.
         if (startYTranslation === null) {
             // TODO: Group the elements with the same initial translation.
@@ -1454,6 +1453,7 @@ class Anim {
             this.endTime = timestamp + this.durationMs;
             return true; // Do nothing
         }
+        // Note: startTime is defined, so endTime is, too.
         let advancementRate = timestamp >= this.endTime ? 1 : (timestamp - this.startTime) / this.durationMs;
         let currentYTranslation = advancementRate * this.targetYTranslation + (1 - advancementRate) * this.startYTranslation;
         let transformString = `translateY(${currentYTranslation}px)`;
