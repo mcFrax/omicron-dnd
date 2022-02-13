@@ -1,6 +1,6 @@
 {
   "name": "omicron-dnd",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "Franek Boehlke <franek.boehlke@gmail.com>",
   "description": "High performance drag and drop library",
   "license": "MIT",
