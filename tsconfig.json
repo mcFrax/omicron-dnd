@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "strictNullChecks": false,
+    "declaration": true,
+    "target": "es6"
+  },
+  "files": ["omicron-dnd.ts"]
+}
