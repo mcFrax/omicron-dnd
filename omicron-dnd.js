@@ -1304,7 +1304,7 @@ function getForbiddenInsertionIndices(containerEl) {
     }
     const fn = containerEl[expando].options.forbiddenInsertionIndicesFn;
     let newValue;
-    if (typeof fn !== null) {
+    if (typeof fn === 'function') {
         newValue = new Set(fn(containerEl, activeEl));
     }
     else {

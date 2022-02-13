@@ -1483,7 +1483,7 @@ function getForbiddenInsertionIndices(containerEl: HTMLElement) {
     const fn =
         ((containerEl as any)[expando] as ContainerData).options.forbiddenInsertionIndicesFn;
     let newValue: Set<number>;
-    if (typeof fn !== null) {
+    if (typeof fn === 'function') {
         newValue = new Set(fn(containerEl, activeEl));
     } else {
         newValue = new Set();
