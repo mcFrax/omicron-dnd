@@ -1066,7 +1066,11 @@ function anyState_container_PointerLeave(event) {
     // this is the pointerup case, the drag will be over by the time the timer
     // executes.
     setTimeout(() => {
-        if (activeEl) {
+        // Make sure that the drag is still pending and we didn't move
+        // to another container. In issue #8 we were hitting toEl === null here,
+        // apparently because several timeouts from several left containers
+        // got clamped together.
+        if (activeEl && toEl === containerEl) {
             leaveContainer();
             // mousemove handler will figure the container to enter.
             // TODO: if it gets glitchy, call the mousemove handler here directly.
