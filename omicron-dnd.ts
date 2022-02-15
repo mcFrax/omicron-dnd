@@ -424,8 +424,6 @@ function anyState_container_PointerDown(event: PointerEvent) {
     // Unconditionally release pointer capture. I do that before any checks
     // for pending drag to avoid unnecessary races with touchstart.
 
-    pointerDownTarget = event.target as HTMLElement;
-
     const containerEl = event.currentTarget as HTMLElement;
     let hasParentContainer = false;
     for (let el = containerEl.parentElement; el; el = el.parentElement) {
@@ -453,6 +451,9 @@ function anyState_container_PointerDown(event: PointerEvent) {
 
     if (startPreDrag(event, event)) {
         pointerId = event.pointerId;
+        pointerDownTarget = event.target as HTMLElement;
+        // Ensure the element has pointer capture.
+        pointerDownTarget.setPointerCapture(pointerId);
     }
 }
 

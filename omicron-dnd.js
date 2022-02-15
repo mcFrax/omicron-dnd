@@ -349,7 +349,6 @@ function cancelIfCancellable(event) {
 function anyState_container_PointerDown(event) {
     // Unconditionally release pointer capture. I do that before any checks
     // for pending drag to avoid unnecessary races with touchstart.
-    pointerDownTarget = event.target;
     const containerEl = event.currentTarget;
     let hasParentContainer = false;
     for (let el = containerEl.parentElement; el; el = el.parentElement) {
@@ -375,6 +374,9 @@ function anyState_container_PointerDown(event) {
     touchDrag = (event.pointerType === 'touch');
     if (startPreDrag(event, event)) {
         pointerId = event.pointerId;
+        pointerDownTarget = event.target;
+        // Ensure the element has pointer capture.
+        pointerDownTarget.setPointerCapture(pointerId);
     }
 }
 // Returns true if preDrag actually started.
