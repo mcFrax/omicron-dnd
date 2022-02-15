@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimal-ui" />
+    <title>Omicron-dnd basic example</title>
+    <style>
+      ul {
+        display: inline-block;
+        padding: 8px;
+      }
+
+      ul.nested {
+        background-color: lightgreen;
+        padding: 2px;
+      }
+
+      li {
+        display: flex;
+        flex-direction: column;
+        font-size: 2rem;
+        margin: 4px;
+        padding: 4px;
+        background: limegreen;
+        border: 6px solid limegreen;
+        border-radius: 1rem;
+        cursor: pointer;
+      }
+      ul.nested li {
+        margin: 1px;
+        font-size: 1.5rem;
+      }
+      .text {
+        background-color: white;
+        border-radius: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <ul id="list">
+      <li><span class="text">The items have containers inside now</span>
+        <ul class="nested">
+          <li>
+            <span class="text">Nested element</span>
+            <ul class="nested"></ul>
+          </li>
+        </ul>
+      </li>
+      <li><span class="text">The nesting can have more levels</span>
+        <ul class="nested">
+          <li>
+            <span class="text">Level 1 nested</span>
+            <ul class="nested">
+              <li>
+                <span class="text">Level 2 nested</span>
+                <ul class="nested"></ul>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+      <li>
+        <span class="text">Foo item</span>
+        <ul class="nested"></ul>
+      </li>
+      <li>
+        <span class="text">Bar item</span>
+        <ul class="nested">
+          <li>
+            <span class="text">Baz item</span>
+            <ul class="nested"></ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </body>
+  <script type="module">
+    import OmicronDnd from './omicron-dnd.js';
+    OmicronDnd.init(document.getElementById('list'));
+    for (let nested of document.getElementsByClassName('nested')) {
+      OmicronDnd.init(nested);
+    }
+  </script>
+</html>
