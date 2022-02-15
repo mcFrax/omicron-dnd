@@ -375,7 +375,12 @@ function anyState_container_PointerDown(event) {
     if (startPreDrag(event, event)) {
         pointerId = event.pointerId;
         pointerDownTarget = event.target;
-        // Ensure the element has pointer capture.
+        // Ensure the element has pointer capture. This happens automatically
+        // for touch, but not for mouse.
+        // Pointer capture is important to avoid calls to enterContainer
+        // and leaveContainer during preDrag - these would mess up the drag
+        // setup WRT toEl. The capture will be released afterwards, allowing
+        // immediate execution of leaveContainer/enterContainer if necessary.
         pointerDownTarget.setPointerCapture(pointerId);
     }
 }
@@ -410,6 +415,8 @@ function startPreDrag(event, evPlace) {
     // We are in statePreDrag. We will start the drag after a delay, or if
     // the mouse moves sufficiently far. We will cancel the drag if the touch
     // moves too far before the delay.
+    // IMPORTANT: Some logic depends on startDrag being called asynchronously,
+    // so even if the delay is 0, setTimeout should still be used.
     preDragTimeoutId = setTimeout(startDrag, delay);
     if (typeof containerOptions.onPreDragStart === 'function') {
         containerOptions.onPreDragStart(fromEl, activeEl, event);
