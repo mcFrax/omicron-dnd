@@ -1,3 +1,8 @@
+var DragKind;
+(function (DragKind) {
+    DragKind[DragKind["Move"] = 0] = "Move";
+    DragKind[DragKind["Copy"] = 1] = "Copy";
+})(DragKind || (DragKind = {}));
 const animMs = 100;
 // A symbol to use for placing data on HTMLElements. The symbol guarantees
 // uniqueness and makes it unreachable outside Omicron.
@@ -17,6 +22,7 @@ let bodyWebkitTouchCallout;
 // Whether the current drag is triggered by touch.
 // Set in pointerdown and not reset after the drag.
 let touchDrag = false;
+let dragKind = DragKind.Move;
 // The container element the drag started in.
 // Always set in preDrag and drag, always null when drag/preDrag inactive.
 let fromEl = null;
@@ -69,6 +75,8 @@ let newIndex = 0;
 // Used for initial positioning of floatEl.
 // TODO: It probably doesn't make sense to store it.
 let initialActiveElRect = null;
+// Whether activeEl is
+let activeElVisible = false;
 // Three XToYOffset values below are used as visual y-offsets
 // for some of the elements during the drag.
 // See comments inside animateMoveInsideContainer for the details.
@@ -186,6 +194,8 @@ class ContainerOptions {
         // FUTURE COMPAT: Options to control the bubbling behavior may be added,
         // similar as for draggableSelector.
         this.handleSelector = null;
+        this.allowPull = DragKind.Move;
+        this.allowDrop = true;
         // Enter guards define the area of the container that may be used to drag
         // elements into it. After the container was entered (became toEl) the whole
         // area can be used to drag the item inside the container.
@@ -223,6 +233,8 @@ class ContainerOptions {
         this.dragStartVibration = 25;
         // onBeforePreDrag: Called just before preDrag starts.
         // Return explicit `false` to cancel the drag.
+        // Return DragKind to override the allowPull behavior for this particular
+        // drag.
         this.onBeforePreDrag = null;
         // The element was chosen and the wait starts for the delay or minimal mouse
         // move to start dragging. The return value is ignored.
@@ -389,6 +401,11 @@ function startPreDrag(event, evPlace) {
     const containerEl = event.currentTarget;
     const containerData = containerEl[expando];
     const containerOptions = containerData.options;
+    if (!containerOptions.allowPull) {
+        // Starting drag in this container is not allowed at all.
+        return false;
+    }
+    dragKind = containerOptions.allowPull;
     activeEl = getItemFromContainerEvent(event, containerData.options);
     if (!activeEl) {
         // TODO: Add an option to .stopPropagation() here as well, to prevent
@@ -398,10 +415,21 @@ function startPreDrag(event, evPlace) {
     // Allow the callback to cancel the preDrag before it starts.
     // This can be used to implement some dynamic barrier on top of
     // draggableSelector, filterSelector, and handleSelector.
-    if (typeof containerOptions.onBeforePreDrag === 'function' &&
-        containerOptions.onBeforePreDrag(containerData.el, activeEl, event) === false) {
-        activeEl = null;
-        return false;
+    if (typeof containerOptions.onBeforePreDrag === 'function') {
+        const ret = containerOptions.onBeforePreDrag(containerData.el, activeEl, event);
+        switch (ret) {
+            case false:
+                // Cancel drag.
+                activeEl = null;
+                return false;
+            case DragKind.Move:
+            case DragKind.Copy:
+                // Override drag kind.
+                dragKind = ret;
+                break;
+            default:
+                break;
+        }
     }
     // Only stop propagation after deciding that something was indeed grabbed.
     // That allows the nested container to be dragged by contents when using
@@ -494,11 +522,13 @@ function startDrag() {
     // height instead of the element's height.
     yEndNoMoveZone = activeEl.offsetTop - nothingToPlaceholderOffset;
     // Note: this is a string with px.
-    let childrenArray = Array.from(fromEl.children);
-    newIndex = oldIndex = childrenArray.indexOf(activeEl);
-    // Use getItemsInContainerCount() to skip placeholder at the end.
-    let itemsAfter = childrenArray.slice(oldIndex + 1, getItemsInContainerEnd(fromEl));
-    Anim.start(fromEl, itemsAfter, activeToPlaceholderOffset, animMs);
+    if (dragKind === DragKind.Move) {
+        let childrenArray = Array.from(fromEl.children);
+        newIndex = oldIndex = childrenArray.indexOf(activeEl);
+        // Use getItemsInContainerCount() to skip placeholder at the end.
+        let itemsAfter = childrenArray.slice(oldIndex + 1, getItemsInContainerEnd(fromEl));
+        Anim.start(fromEl, itemsAfter, activeToPlaceholderOffset, animMs);
+    }
     if (typeof containerOptions.onDragStart === 'function') {
         containerOptions.onDragStart(fromEl, activeEl);
     }
@@ -703,7 +733,7 @@ function findUpdatedNewIndex(evtPoint, insertionContainer) {
         // Correct for the fact that if we dragged the element down from
         // its place, some elements above it are shifted from their
         // offset position.
-        let offsetCorrection = containerEl === fromEl ? activeToNothingOffset : 0;
+        let offsetCorrection = containerEl === fromEl && dragKind === DragKind.Move ? activeToNothingOffset : 0;
         updatedNewIndex = startIndex;
         // We may look up one extra element at the start, but that is not an issue.
         let iterationStart = endIndex - 1;
@@ -712,7 +742,7 @@ function findUpdatedNewIndex(evtPoint, insertionContainer) {
         }
         for (let i = iterationStart; i >= startIndex; --i) {
             let otherEl = containerEl.children[i];
-            if (otherEl === activeEl)
+            if (otherEl === activeEl && dragKind === DragKind.Move)
                 continue;
             if (i < oldIndex) {
                 // We could check for (toEl === fromEl) here, but the
@@ -726,7 +756,7 @@ function findUpdatedNewIndex(evtPoint, insertionContainer) {
             let otherHeight = otherEl.offsetHeight;
             if (mouseY > otherTop + bottomSnapBorder * otherHeight) {
                 // Insert activeEl after otherEl.
-                if (containerEl === fromEl && i > oldIndex) {
+                if (containerEl === fromEl && dragKind === DragKind.Move && i > oldIndex) {
                     // Special new case. otherEl will be moved up
                     // and end up with index i-1, so inserting after
                     // it means we will end up with index i.
@@ -743,13 +773,13 @@ function findUpdatedNewIndex(evtPoint, insertionContainer) {
         let offsetCorrection = nothingToPlaceholderOffset;
         // Set to the highest possible value - in case we are at the very
         // bottom of the container.
-        updatedNewIndex = (containerEl === fromEl) ? endIndex - 1 : endIndex;
+        updatedNewIndex = (containerEl === fromEl && dragKind === DragKind.Move) ? endIndex - 1 : endIndex;
         // We may look up one extra element at the start, but that is not an issue.
         for (let i = newIndex; i < endIndex; ++i) {
             let otherEl = containerEl.children[i];
-            if (otherEl === activeEl)
+            if (otherEl === activeEl && dragKind === DragKind.Move)
                 continue; // May still happen.
-            if (i > oldIndex && containerEl === fromEl) {
+            if (i > oldIndex && containerEl === fromEl && dragKind === DragKind.Move) {
                 offsetCorrection = activeToPlaceholderOffset;
             }
             if (getComputedStyle(otherEl).display === 'none') {
@@ -759,7 +789,7 @@ function findUpdatedNewIndex(evtPoint, insertionContainer) {
             let otherHeight = otherEl.offsetHeight;
             if (mouseY < otherTop + bottomSnapBorder * otherHeight) {
                 // Insert activeEl before otherEl.
-                if (containerEl === fromEl && i > oldIndex) {
+                if (containerEl === fromEl && dragKind === DragKind.Move && i > oldIndex) {
                     // Special new case. otherEl won't be bumped to i+1
                     // but instead back to i-th position when we
                     // re-insert activeEl, so the inserting splice
@@ -797,19 +827,19 @@ function findPlaceholderTop() {
         ref = null;
         offsetCorrection = 0;
     }
-    else if (toEl === fromEl && newIndex === endIndex - 1) {
+    else if (toEl === fromEl && dragKind === DragKind.Move && newIndex === endIndex - 1) {
         // Last element in fromEl.
         ref = toEl.children[endIndex - 1];
         // Position the placeholder _after_ the ref.
         offsetCorrection = ref.offsetHeight + 8 + activeToNothingOffset;
     }
-    else if (toEl !== fromEl && newIndex === endIndex) {
+    else if ((toEl !== fromEl || dragKind !== DragKind.Move) && newIndex === endIndex) {
         // Last element, not in fromEl.
         ref = toEl.children[endIndex - 1];
         // Position the placeholder _after_ the ref.
         offsetCorrection = ref.offsetHeight + 8;
     }
-    else if (toEl === fromEl && newIndex > oldIndex) {
+    else if (toEl === fromEl && dragKind === DragKind.Move && newIndex > oldIndex) {
         ref = toEl.children[newIndex + 1];
         offsetCorrection = activeToNothingOffset;
     }
@@ -852,7 +882,6 @@ function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
     // each of them.
     // shadow newIndex to avoid using it accidentally
     let newIndex = 'DEATH AND DESTRUCTION!';
-    let inFromEl = (fromEl === containerEl);
     let maxItemIndex = getItemsInContainerEnd(containerEl) - 1;
     let affectedStart = Math.min(maxItemIndex, Math.min(newNewIndex, previousIndex));
     let affectedEnd = Math.min(maxItemIndex, Math.max(newNewIndex, previousIndex));
@@ -866,9 +895,9 @@ function animateMoveInsideContainer(containerEl, previousIndex, newNewIndex) {
     // for determining the affected range.
     for (let i = affectedStart; i <= affectedEnd; ++i) {
         let otherEl = containerEl.children[i];
-        if (otherEl === activeEl)
+        if (otherEl === activeEl && dragKind === DragKind.Move)
             continue;
-        let afterOld = inFromEl && i >= oldIndex;
+        let afterOld = containerEl === fromEl && dragKind === DragKind.Move && i >= oldIndex;
         let afterNew = afterOld ? i > newNewIndex : i >= newNewIndex;
         if (afterNew && afterOld) {
             Anim.start(containerEl, [otherEl], activeToPlaceholderOffset, animMs);
@@ -924,7 +953,8 @@ function removeClickBlocker() {
     document.removeEventListener('click', preventNextClick, true);
 }
 function exitDrag(execSort) {
-    let animBackFromFloat = Boolean(floatEl);
+    let floatElExisted = Boolean(floatEl);
+    let insertEl = null;
     if (floatEl) {
         floatEl.remove(); // Removing this element now saves some special casing.
         floatEl = null;
@@ -953,7 +983,9 @@ function exitDrag(execSort) {
         // to do that in one go for each element, but that would involve
         // several cases and so on. I'll just do that as I go, and not
         // worry that I do that twice for some elements most of the time.
-        activeEl.remove();
+        if (dragKind === DragKind.Move) {
+            activeEl.remove();
+        }
         // Adjust elements after removed and animate them to 0.
         for (let elem of Array.from(fromEl.children).slice(oldIndex)) {
             let currentTransform = (transformsByElem.get(elem) || [0, 0]);
@@ -963,11 +995,12 @@ function exitDrag(execSort) {
             }
             Anim.start(fromEl, [elem], 0, animMs, currentTransform[1]);
         }
+        insertEl = (dragKind === DragKind.Move) ? activeEl : activeEl.cloneNode(true);
         if (newIndex === toEl.children.length) {
-            toEl.appendChild(activeEl);
+            toEl.appendChild(insertEl);
         }
         else {
-            toEl.children[newIndex].before(activeEl);
+            toEl.children[newIndex].before(insertEl);
         }
         // Adjust elements after inserted and animate them to 0.
         for (let elem of Array.from(toEl.children).slice(newIndex + 1)) {
@@ -987,11 +1020,12 @@ function exitDrag(execSort) {
             }
         }
     }
-    if (animBackFromFloat) {
+    if (floatElExisted) {
+        let animElem = insertEl || activeEl;
         // Our Anim handles only y animation for now, we should fix that.
         // However, let's at least handle the y.
-        let activeElRect = activeEl.getClientRects()[0];
-        Anim.start(activeEl, [activeEl], 0, animMs, yDragClientPos - activeElRect.top);
+        let destRect = animElem.getClientRects()[0];
+        Anim.start(animElem, [animElem], 0, animMs, yDragClientPos - destRect.top);
     }
     unstyleActiveEl();
     deactivatePlaceholder();
@@ -1100,7 +1134,7 @@ function anyState_container_PointerLeave(event) {
 function maybeEnterContainer(containerData, evPlace) {
     let cData = containerData;
     let rect = cData.el.getClientRects()[0];
-    if (!rect) {
+    if (!cData.options.allowDrop || !rect) {
         return false;
     }
     if (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
@@ -1257,11 +1291,13 @@ function removeBottomPaddingCorrection() {
     }
 }
 function styleActiveEl() {
-    // Theoretically some descendants can have visibility set explicitly
-    // to visible and then whey would be visible anyway, so let's double
-    // down with opacity: 0;
-    activeEl.style.visibility = 'hidden';
-    activeEl.style.opacity = '0';
+    if (dragKind === DragKind.Move) {
+        // Theoretically some descendants can have visibility set explicitly
+        // to visible and then whey would be visible anyway, so let's double
+        // down with opacity: 0;
+        activeEl.style.visibility = 'hidden';
+        activeEl.style.opacity = '0';
+    }
     activeEl.style.pointerEvents = 'none';
     activeEl.classList.add('drag-active-item');
 }
@@ -1312,7 +1348,7 @@ function isForbiddenIndex(containerEl, index) {
     // TODO: Optimize for getting forbidden index from toEl? We are almost
     // always looking at the toEl anyway.
     let forbiddenIndices = getForbiddenInsertionIndices(containerEl);
-    if (containerEl === fromEl && index > oldIndex) {
+    if (containerEl === fromEl && dragKind === DragKind.Move && index > oldIndex) {
         return forbiddenIndices.has(index + 1);
     }
     return forbiddenIndices.has(index);
@@ -1533,4 +1569,5 @@ function toggleListeners(toggleOn, element, eventHandlerPairs) {
 }
 export default {
     init: initDragContainer,
+    DragKind,
 };

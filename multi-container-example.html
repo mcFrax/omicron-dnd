@@ -52,7 +52,9 @@
   <script type="module">
     import OmicronDnd from './omicron-dnd.js';
     for (const ulElem of document.getElementsByTagName('ul')) {
-      OmicronDnd.init(ulElem);
+      OmicronDnd.init(ulElem, {
+        allowPull: OmicronDnd.DragKind.Copy,
+      });
     }
   </script>
 </html>

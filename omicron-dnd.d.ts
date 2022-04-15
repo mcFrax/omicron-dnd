@@ -13,10 +13,16 @@ interface DragEndEvent {
     oldIndex: number;
     newIndex: number | null;
 }
+declare enum DragKind {
+    Move = 0,
+    Copy = 1
+}
 declare class ContainerOptions {
     draggableSelector: string | null;
     filterSelector: string | null;
     handleSelector: string | null;
+    allowPull: DragKind | false;
+    allowDrop: Boolean;
     enterGuardLeft: number;
     enterGuardLeftPx: number;
     enterGuardRight: number;
@@ -25,7 +31,7 @@ declare class ContainerOptions {
     floatElScale: number;
     setWebkitTapHighlightColorTransparent: boolean;
     dragStartVibration: number;
-    onBeforePreDrag: ((containerEl: HTMLElement, activeEl: HTMLElement, event: MouseEvent | PointerEvent | TouchEvent) => void | false) | null;
+    onBeforePreDrag: ((containerEl: HTMLElement, activeEl: HTMLElement, event: MouseEvent | PointerEvent | TouchEvent) => void | DragKind | false) | null;
     onPreDragStart: ((containerEl: HTMLElement, activeEl: HTMLElement, event: MouseEvent | PointerEvent | TouchEvent) => void) | null;
     onBeforeDragStart: ((containerEl: HTMLElement, activeEl: HTMLElement) => void) | null;
     onFloatElementCreated: ((floatEl: HTMLElement, containerEl: HTMLElement, activeEl: HTMLElement) => void) | null;
@@ -40,5 +46,6 @@ declare class ContainerOptions {
 declare function initDragContainer(containerEl: HTMLElement, options: Partial<ContainerOptions>): void;
 declare const _default: {
     init: typeof initDragContainer;
+    DragKind: typeof DragKind;
 };
 export default _default;
