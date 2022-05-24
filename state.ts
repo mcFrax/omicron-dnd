@@ -1,6 +1,8 @@
 
 import {
   DragKind,
+} from './external-types';
+import {
   Vec2D,
   ItemPlace,
   InsertionPlaceCandidate,

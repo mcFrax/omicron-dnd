@@ -1,4 +1,4 @@
-import { DragKind } from './base-types';
+import { DragKind } from './external-types';
 import { dragState } from './state';
 
 // Insertion index is the index at which we will insert the item.

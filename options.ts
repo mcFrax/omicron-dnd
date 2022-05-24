@@ -1,4 +1,9 @@
 
+import {
+    DragKind,
+    DragEndEvent,
+} from './external-types';
+
 // Options for an Omicron container.
 // Actual options for a container are stored in
 // containerEl[expando].options.
