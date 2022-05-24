@@ -224,7 +224,7 @@ const hoverContainersByDepth: ContainerData[] = [];
 // Reset after each drag.
 let forbiddenInsertionIndicesCache: Map<HTMLElement, Set<number>> = new Map();
 
-// Default options for an Omicron container.
+// Options for an Omicron container.
 // Actual options for a container are stored in
 // containerEl[expando].options.
 class ContainerOptions {
