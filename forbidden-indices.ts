@@ -1,16 +1,17 @@
+import { expando, ContainerEl } from './expando';
+
 export default class ForbiddenIndices {
 
-  public isForbiddenIndex(containerEl: HTMLElement, pickedEl: HTMLElement, index: number) {
+  public isForbiddenIndex(containerEl: ContainerEl, pickedEl: HTMLElement, index: number) {
       return this.getForbiddenInsertionIndices(containerEl, pickedEl).has(index);
   }
 
-  private getForbiddenInsertionIndices(containerEl: HTMLElement, pickedEl: HTMLElement) {
+  private getForbiddenInsertionIndices(containerEl: ContainerEl, pickedEl: HTMLElement) {
       let cachedValue = this.forbiddenInsertionIndicesCache.get(containerEl);
       if (cachedValue) {
           return cachedValue;
       }
-      const fn =
-          ((containerEl as any)[expando] as ContainerData).options.forbiddenInsertionIndicesFn;
+      const fn = containerEl[expando].options.forbiddenInsertionIndicesFn;
       let newValue: Set<number>;
       if (typeof fn === 'function') {
           newValue = new Set(fn(containerEl, pickedEl));
@@ -23,4 +24,3 @@ export default class ForbiddenIndices {
 
   private forbiddenInsertionIndicesCache: Map<HTMLElement, Set<number>> = new Map();
 }
-

@@ -1,10 +1,4 @@
-import { ContainerOptions } from './options';
-
-export interface ContainerData {
-    el: HTMLElement,
-    options: ContainerOptions,
-    domDepth: number,
-}
+import { ContainerEl } from './expando';
 
 export type BaseDragEndEvent = {
     item: HTMLElement,
@@ -52,12 +46,12 @@ export type EvPlace = {
 
 
 export type ItemPlace = {
-  containerEl: HTMLElement
+  containerEl: ContainerEl
   index: number
 };
 
 export type InsertionPlace = {
-  containerEl: HTMLElement
+  containerEl: ContainerEl
   insertionIndex: number // Where we will insert item
   eventualIndex: number // Where it will end up
 }

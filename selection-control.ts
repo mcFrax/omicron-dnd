@@ -1,32 +1,34 @@
 declare global {
     interface CSSStyleDeclaration {
         // Typescript doesn't know about some -webkit extensions.
-        webkitUserSelect: string,
         webkitTouchCallout: string,
     }
 }
 
-let killed = false;
-let bodyUserSelect: string | null;
-let bodyWebkitUserSelect: string | null;
-let bodyWebkitTouchCallout: string | null;
+let saved: {
+  bodyUserSelect: string,
+  // These may actually be undefined, but it doesn't really matter - they are
+  // assignable where they should be anyway.
+  bodyWebkitUserSelect: string,
+  bodyWebkitTouchCallout: string,
+} | null;
 
 export function killSelection() {
-  if (killed) return;
-  bodyUserSelect = document.body.style.userSelect;
-  bodyWebkitUserSelect = document.body.style.webkitUserSelect;
-  bodyWebkitTouchCallout = document.body.style.webkitTouchCallout;
+  if (saved) return;
+  saved = {
+    bodyUserSelect: document.body.style.userSelect,
+    bodyWebkitUserSelect: document.body.style.webkitUserSelect,
+    bodyWebkitTouchCallout: document.body.style.webkitTouchCallout,
+  }
   document.body.style.userSelect = 'none';
   document.body.style.webkitUserSelect = 'none';
   document.body.style.webkitTouchCallout = 'none';
-  killed = true;
 }
 
-
 export function revertSelection() {
-  if (killed) return;
-  document.body.style.userSelect = bodyUserSelect;
-  document.body.style.webkitUserSelect = bodyWebkitUserSelect;
-  document.body.style.webkitTouchCallout = bodyWebkitTouchCallout;
-  killed = false;
+  if (!saved) return;
+  document.body.style.userSelect = saved.bodyUserSelect;
+  document.body.style.webkitUserSelect = saved.bodyWebkitUserSelect;
+  document.body.style.webkitTouchCallout = saved.bodyWebkitTouchCallout;
+  saved = null;
 }
