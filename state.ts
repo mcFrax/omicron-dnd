@@ -7,7 +7,7 @@ import {
 } from './base-types';
 import ForbiddenIndices from './forbidden-indices';
 
-enum StateEnum {
+export enum StateEnum {
   PreDrag,
   PendingDrag,
   AfterDrag,
@@ -23,6 +23,8 @@ type BaseDragState = {
   from: ItemPlace
   initialPickupRect: DOMRect
   pickupPointerPos: Vec2D
+  currentPointerPos: Vec2D
+  floatPos: Vec2D
   pointerOffset: Vec2D // pickupPointerPos offset wrt initialPickupRect
   forbiddenIndices: ForbiddenIndices
 };
