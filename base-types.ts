@@ -8,9 +8,7 @@ export type Vec2D = {
 export type EvPlace = {
     readonly clientX: number;
     readonly clientY: number;
-    readonly screenX: number;
-    readonly screenY: number;
-};  // It really is MouseEvent|Touch, but maybe such explicity about what should be accessed is better?
+};
 
 
 export type ItemOriginalPlace = {

@@ -1,13 +1,16 @@
 
+import { Anim } from "./anims";
 import { EvPlace } from "./base-types";
-import { hasContainerAncestor } from "./dom-traversal";
+import { getItemFromContainerEvent, getItemsInContainerEndIndex, hasContainerAncestor } from "./dom-traversal";
 import { cancelIfCancellable, cancelIfOmicronActive } from "./event-utils";
 import { ContainerEl, expando } from "./expando";
 import { DragKind } from "./external-types";
 import ForbiddenIndices from "./forbidden-indices";
+import { makeInvisible } from "./invisible-item";
 import { ContainerOptions } from "./options";
+import { disableOverscrollBehavior } from "./overscroll-behavior";
 import { globalDisableSelection } from "./selection-control";
-import { dragState, setDragState, StateEnum } from "./state";
+import { dragState, PreDragState, setDragState, StateEnum } from "./state";
 
 
 // The direction of the last pointer move in y-coordinates.
@@ -159,6 +162,12 @@ function anyState_container_PointerDown(event: PointerEvent) {
       x: event.clientX,
       y: event.clientY,
     };
+    // I add some arbitrary difference to give the effect of the element
+    // snapping out of place, instead of just staying in place silently.
+    const floatFromPointerOffset = {
+      x: initialPickupRect.x - pickupPointerPos.x + 16,
+      y: initialPickupRect.y - pickupPointerPos.y - 4,
+    };
 
     // We are entering statePreDrag. We will start the drag after a delay, or if
     // the mouse moves sufficiently far. We will cancel the drag if the touch
@@ -193,109 +202,69 @@ function anyState_container_PointerDown(event: PointerEvent) {
         pickedEl,
         initialPickupRect,
         pickupPointerPos,
+        floatFromPointerOffset,
         currentPointerPos: pickupPointerPos,
         floatElScale: containerOptions.floatElScale,
         forbiddenIndices: new ForbiddenIndices(),
         preDragTimeoutId,
-        floatEl: undefined,
-        to: undefined,
     });
 }
 
 function startDrag() {
-    if (preDragTimeoutId) {
-        clearTimeout(preDragTimeoutId);
-        preDragTimeoutId = 0;
-    }
-    let containerData = (fromEl as any)[expando] as ContainerData;
+    if (dragState?.state !== StateEnum.PreDrag) return;
+    // In case this was triggered by mouse, and not by the timeout itsef, we
+    // cancel the timeout.
+    clearTimeout(dragState.preDragTimeoutId);
+    let containerData = dragState.from.containerEl[expando];
     const containerOptions = containerData.options;
     if (typeof containerOptions.onBeforeDragStart === 'function') {
-        containerOptions.onBeforeDragStart(fromEl, activeEl);
+        containerOptions.onBeforeDragStart(dragState.from.containerEl, dragState.pickedEl);
     }
 
-    toEl = fromEl;
-    containerData.domDepth = getDomDepth(fromEl);
-    if (hoverContainersByDepth.indexOf(containerData) === -1) {
-        hoverContainersByDepth.push(containerData);
-        hoverContainersByDepth.sort(cmpDomDepth);
-    }
     // Should we go over the whole activeEl subtree and mark the containers there
     // as inactive? We may need to, actually.
 
-    toggleEvents_stateDrag(true);
-    toggleEvents_statePreDrag(false);
+    toggleEvents_stateDrag(true, dragState.touchDrag);
+    toggleEvents_statePreDrag(false, dragState.touchDrag);
 
     // Release default pointer capture. This is important that it happens only
     // after dragStart, and that we keep the capture during preDrag - that saves
     // us from some subtle race conditions. See issue #11 for context.
-    if (pointerDownTarget) {
+    if (dragState.pointerDownTarget) {
         // Pointermove events are by default all captured by the pointerdown's target.
         // That means no pointerenter/pointerleave events, that we rely on, so
         // we need to release the pointer capture.
         // Source: https://stackoverflow.com/questions/27908339/js-touch-equivalent-for-mouseenter
-        pointerDownTarget.releasePointerCapture(pointerId);
+        dragState.pointerDownTarget.releasePointerCapture(dragState.pointerId);
     }
 
-    scrollers = collectScrollers(toEl);
+    disableOverscrollBehavior();
 
-    // Prevent the scroll-to-refresh behavior and the effect
-    // of bumping into the scroll end on mobile.
-    // TODO: call it only after the delay.
-    htmlOvescrollBehavior = document.documentElement.style.overscrollBehavior;
-    bodyOvescrollBehavior = document.body.style.overscrollBehavior;
-    document.documentElement.style.overscrollBehavior = 'none';
-    document.body.style.overscrollBehavior = 'none';
-
-    // I add some arbitrary difference to give the effect of the element
-    // snapping out of place, instead of just staying in place silently.
-    xCursorOffset = initialActiveElRect.left - xInitial + 16;
-    yCursorOffset = initialActiveElRect.top - yInitial - 4;
-    xDragClientPos = xLast + xCursorOffset;
-    yDragClientPos = yLast + yCursorOffset;
-
-    createPlaceholder();
-
-    const activeElHeight = activeEl.offsetHeight;
-
-    // Note: placeholder height may change depending on the container, but
-    // it will always stay the same for fromEl, and activeToX offsets are
-    // only used in fromEl - so we can compute them just once, unlike
-    // nothingToPlaceholderOffset.
-    activeToPlaceholderOffset = placeholderEl.offsetHeight - activeElHeight;
-    activeToNothingOffset = -activeElHeight - 8;
-
-    placeholderEl.style.transform = `translateY(${activeEl.offsetTop}px)`;
-    activatePlaceholder();
-
-    floatElScale = containerOptions.floatElScale;
-    createFloatEl();
+    const floatEl = createFloatEl(dragState);
 
     if (typeof containerOptions.onFloatElementCreated === 'function') {
-        containerOptions.onFloatElementCreated(floatEl, fromEl, activeEl);
+        containerOptions.onFloatElementCreated(floatEl, dragState.from.containerEl, dragState.pickedEl);
     }
 
-    styleActiveEl();
+    if (dragState.dragKind === DragKind.Move) {
+        makeInvisible(dragState.pickedEl);
 
-    yStartNoMoveZone = activeEl.offsetTop - 8;
-    // We need to compute the end from the top, and use placeholder's
-    // height instead of the element's height.
-    yEndNoMoveZone = activeEl.offsetTop - nothingToPlaceholderOffset;
-
-    // Note: this is a string with px.
-
-    if (dragKind === DragKind.Move) {
-        let childrenArray = Array.from(fromEl.children);
-        newIndex = oldIndex = childrenArray.indexOf(activeEl);
-        // Use getItemsInContainerCount() to skip placeholder at the end.
-        let itemsAfter = childrenArray.slice(oldIndex + 1, getItemsInContainerEnd(fromEl));
-        Anim.start(fromEl, itemsAfter as HTMLElement[], activeToPlaceholderOffset, animMs);
+        // Schedule animation of moving pickedEl out of the container. In practice,
+        // We will almost always override it with another animation of "insertion",
+        // but sometimes it may happen that we actually leave the original container
+        // immediately.
+        animateMoveInsideContainer(
+            dragState.from.containerEl,
+            dragState.from.index,
+            getItemsInContainerEndIndex(dragState.from.containerEl),
+        );
     }
 
     if (typeof containerOptions.onDragStart === 'function') {
-        containerOptions.onDragStart(fromEl, activeEl);
+        containerOptions.onDragStart(dragState.from.containerEl, dragState.pickedEl);
     }
     if (typeof containerOptions.onContainerEntered === 'function') {
-        containerOptions.onContainerEntered(fromEl, activeEl);
+        containerOptions.onContainerEntered(dragState.from.containerEl, dragState.pickedEl);
     }
 
     if (navigator.vibrate && containerData.options.dragStartVibration) {
@@ -306,6 +275,13 @@ function startDrag() {
         // See https://stackoverflow.com/a/46189638/2468549.
         navigator.vibrate(containerData.options.dragStartVibration);
     }
+
+    // Synthethic update, to determine the insertion point.
+    // TODO: We might need to give it a hint that this is a drag start, after all.
+    updateOnMove({
+      clientX: dragState.currentPointerPos.x,
+      clientY: dragState.currentPointerPos.y,
+    });
 }
 function statePreDrag_window_TouchStart(event: TouchEvent) {
     if (activeEl && event.touches.length !== 1) {
@@ -1117,30 +1093,9 @@ function removeBottomPaddingCorrection() {
     }
 }
 
-function styleActiveEl() {
-    if (dragKind === DragKind.Move) {
-        // Theoretically some descendants can have visibility set explicitly
-        // to visible and then whey would be visible anyway, so let's double
-        // down with opacity: 0;
-        activeEl.style.visibility = 'hidden';
-        activeEl.style.opacity = '0';
-    }
-    activeEl.style.pointerEvents = 'none';
-    activeEl.classList.add('drag-active-item');
-}
-
-function unstyleActiveEl() {
-    // Note: if there were any inline styles on the element, uh, we have
-    // just erased them. I think that is resonable to force users to just
-    // deal with it.
-    activeEl.classList.remove('drag-active-item');
-    activeEl.style.visibility = null;
-    activeEl.style.opacity = null;
-    activeEl.style.pointerEvents = null;
-}
-
-function createFloatEl() {
-    floatEl = activeEl.cloneNode(true) as HTMLElement;
+function createFloatEl(dragState: PreDragState): HTMLElement {
+    const pickedEl = dragState.pickedEl;
+    const floatEl = pickedEl.cloneNode(true) as HTMLElement;
 
     floatEl.style.position = 'fixed';
     floatEl.style.left = '0';
@@ -1149,10 +1104,14 @@ function createFloatEl() {
     floatEl.style.zIndex = '10000000';
     floatEl.style.pointerEvents = 'none';
 
-    floatEl.style.width = getComputedStyle(activeEl).width;
-    floatEl.style.height = getComputedStyle(activeEl).height;
-    floatEl.style.transformOrigin = `${-xCursorOffset}px ${-yCursorOffset}px`;
-    floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px) scale(${floatElScale})`;
+    floatEl.style.width = getComputedStyle(pickedEl).width;
+    floatEl.style.height = getComputedStyle(pickedEl).height;
+    const tOrigX = -dragState.floatFromPointerOffset.x;
+    const tOrigY = -dragState.floatFromPointerOffset.y;
+    floatEl.style.transformOrigin = `${tOrigX}px ${tOrigY}px`;
+    const posX = dragState.currentPointerPos.x + dragState.floatFromPointerOffset.x;
+    const posY = dragState.currentPointerPos.y + dragState.floatFromPointerOffset.y;
+    floatEl.style.transform = `translate(${posX}px,${posY}px) scale(${dragState.floatElScale})`;
     floatEl.classList.add('drag-float-item');
 
     // Position fixed is great, but it has limitation: if any ancestor
@@ -1165,280 +1124,8 @@ function createFloatEl() {
     // to Sortable's fallbackOnBody, but for now we just need it outside
     // and free of any rogue containing block candidates.
     document.body.appendChild(floatEl);
-}
 
-// Utils.
-
-// There is a sneaky subtlety in using forbiddenIndices, as for elements
-// in fromEl after oldIndex the newIndex refers not to the object we would
-// inserting before, but instead the one we will be inserting after (i.e.
-// everything is shifted by one index).
-// In order to simplify writing forbiddenInsertionIndicesFns, I make it
-// ignore the shift (i.e. return the same values regardless whether the
-// given container is fromEl or not), and make the correction here instead.
-// The important caveat is that forbiddenIndices set should always be read
-// through this function.
-function isForbiddenIndex(containerEl: HTMLElement, index: number) {
-    // TODO: Optimize for getting forbidden index from toEl? We are almost
-    // always looking at the toEl anyway.
-    let forbiddenIndices = getForbiddenInsertionIndices(containerEl);
-    if (containerEl === fromEl && dragKind === DragKind.Move && index > oldIndex) {
-        return forbiddenIndices.has(index + 1);
-    }
-    return forbiddenIndices.has(index);
-}
-
-function getForbiddenInsertionIndices(containerEl: HTMLElement) {
-    let cachedValue = forbiddenInsertionIndicesCache.get(containerEl);
-    if (cachedValue) {
-        return cachedValue;
-    }
-    const fn =
-        ((containerEl as any)[expando] as ContainerData).options.forbiddenInsertionIndicesFn;
-    let newValue: Set<number>;
-    if (typeof fn === 'function') {
-        newValue = new Set(fn(containerEl, activeEl));
-    } else {
-        newValue = new Set();
-    }
-    forbiddenInsertionIndicesCache.set(containerEl, newValue);
-    return newValue;
-}
-
-function collectScrollers(elem: HTMLElement|null) : ScrollerRecord[] {
-    let result = [];
-    // TODO: Include document.scrollingElement
-    for (; elem; elem = elem.parentElement) {
-        let style = getComputedStyle(elem);
-        let horizontalScroll =
-            style.overflowX === 'auto' || style.overflowX === 'scroll';
-        let verticalScroll =
-            style.overflowY === 'auto' || style.overflowY === 'scroll';
-        if (!horizontalScroll && !verticalScroll) {
-            continue;
-        }
-        let domRect = elem.getClientRects()[0];
-        // Create our own structure. Origina DOMRect is read-only, and
-        // we want to be able to make updates.
-        let rect = {
-            left: domRect.left,
-            top: domRect.top,
-            right: domRect.right,
-            bottom: domRect.bottom,
-        };
-        let record = knownScrollers.get(elem);
-        if (record) {
-            record.rect = rect; // Update the rect.
-        } else {
-            record = {
-                el: elem,
-                rect,
-                horizontal: horizontalScroll,
-                vertical: verticalScroll,
-                snap: Boolean(elem.dataset.omicronScrollSnap),
-                snapCooldown: false,
-            };
-            knownScrollers.set(elem, record);
-        }
-        result.push(record);
-    }
-    return result;
-}
-
-// Get elem's depth in the DOM tree.
-// Note: no special handling for elements not attached to actual document.
-function getDomDepth(elem: HTMLElement|null) {
-    let result = 0;
-    for (elem = elem && elem.parentElement; elem; elem = elem.parentElement) {
-        ++result;
-    }
-    return result;
-}
-
-// Get the first index for items that we consider for drag and drop
-// end positioning. Skip anything with display: none.
-function getItemsInContainerStart(containerEl: HTMLElement) {
-    for (let i = 0; i < containerEl.children.length; ++i) {
-        if (getComputedStyle(containerEl.children[i]).display !== 'none') {
-            return i;
-        }
-    }
-    // Nothing was found. That means that getItemsInContainerEnd() will also
-    // find nothing and return 0, so let's return 0 for start/end consistency.
-    return 0;
-}
-
-// Get the after-last index for items that we consider for drag and drop
-// end positioning.
-// Skip the temporary Omicron's elements at the end of the container,
-// as well as anything with display: none.
-function getItemsInContainerEnd(containerEl: HTMLElement) {
-    for (let i = containerEl.children.length - 1; i >= 0; --i) {
-        const candidate = containerEl.children[i];
-        if (candidate !== floatEl &&
-                candidate !== placeholderEl &&
-                getComputedStyle(candidate).display !== 'none') {
-            // i is the index of last actual element, so the end index is i+1.
-            return i + 1;
-        }
-    }
-    return 0;
-}
-
-// Anim is implemented to hold an array of elems, but we actually rely on it
-// holding only one (which means we can delete the whole old anim when adding
-// new one for the same element).
-class Anim {
-    static start(
-            parentEl: HTMLElement,
-            elems: HTMLElement[],
-            targetYTranslation: number,
-            durationMs: number,
-            startYTranslation: number|null=null) {
-        // How the actual, visible position differs from offsetTop.
-        if (startYTranslation === null) {
-            // TODO: Group the elements with the same initial translation.
-            // Round the initial translation to avoid sub-pixel differences.
-            // Alternatively work it around so that we _know_ all elements
-            // have the same starting transform - generating all these rects
-            // is a lot of useless computation and allocation.
-            for (let elem of elems) {
-                startYTranslation = (transformsByElem.get(elem) || [0, 0])[1];
-                if (startYTranslation !== targetYTranslation) {
-                Anim.add(elem, new Anim(parentEl, [elem], startYTranslation, targetYTranslation, durationMs));
-                } else {
-                let currentAnim = animsByElem.get(elem);
-                if (currentAnim) {
-                    currentAnim.remove();
-                }
-                }
-            }
-        } else {
-            // Immediately make sure that the elements are where they are supposed to start.
-            let transformString = `translateY(${startYTranslation}px)`;
-            for (let elem of elems) {
-                elem.style.transform = transformString;
-                Anim.add(elem, new Anim(parentEl, [elem], startYTranslation, targetYTranslation, durationMs));
-            }
-        }
-        if (!animFrameRequestId) {
-            animFrameRequestId = requestAnimationFrame(animationFrame);
-        }
-    }
-
-    /* private */ static add(elem: HTMLElement, anim: Anim) {
-        // Replace any old anim for this elem.
-        let previousAnim = animsByElem.get(elem);
-        if (previousAnim) {
-            anims[anims.indexOf(previousAnim)] = anim;
-        } else {
-        anims.push(anim);
-        }
-        animsByElem.set(elem, anim);
-    }
-
-    parentEl: HTMLElement;
-    elems: HTMLElement[];
-    startYTranslation: number;
-    targetYTranslation: number;
-    durationMs: number;
-    startTime: DOMTimeStamp|null;  // Will be filled in in the animation frame.
-    endTime: DOMTimeStamp|null;
-
-    /* private */ constructor(
-            parentEl: HTMLElement,
-            elems: HTMLElement[],
-            startYTranslation: number,
-            targetYTranslation: number,
-            durationMs: number) {
-        // assert(elems.length);
-        this.parentEl = parentEl;
-        this.elems = elems;
-        this.startYTranslation = startYTranslation;
-        this.targetYTranslation = targetYTranslation;
-        this.durationMs = durationMs;
-        this.startTime = null;  // Will be filled in in the animation frame.
-        this.endTime = null;
-    }
-
-    // Will return true if the next frame should be requested.
-    animationFrame(timestamp: DOMTimeStamp) {
-        if (!this.startTime) {
-            this.startTime = timestamp;
-            this.endTime = timestamp + this.durationMs;
-            return true;  // Do nothing
-        }
-        // Note: startTime is defined, so endTime is, too.
-        let advancementRate =
-            timestamp >= (this.endTime as number) ? 1 : (timestamp - this.startTime) / this.durationMs;
-        let currentYTranslation =
-            advancementRate * this.targetYTranslation + (1 - advancementRate) * this.startYTranslation;
-        let transformString = `translateY(${currentYTranslation}px)`;
-        for (let elem of this.elems) {
-            if (currentYTranslation === 0) {
-                transformsByElem.delete(elem);
-            } else {
-                transformsByElem.set(elem, [0, currentYTranslation]);
-            }
-            elem.style.transform = transformString;
-        }
-        return (advancementRate < 1);
-    }
-
-    remove() {
-    for (let elem of this.elems) {
-        animsByElem.delete(elem);
-    }
-    anims[anims.indexOf(this)] = anims[anims.length - 1];
-    anims.pop();
-    }
-}
-
-function getItemFromContainerEvent(event: Event, options: ContainerOptions): HTMLElement|null {
-    let containerEl = event.currentTarget as HTMLElement;
-    let result = null;
-    let handleFound = false;
-    for (let el = event.target as HTMLElement; el !== containerEl; el = el.parentElement) {
-        if (options.filterSelector && el.matches(options.filterSelector)) {
-            return null;
-        }
-        if (options.handleSelector && el.matches(options.handleSelector)) {
-            handleFound = true;
-        }
-        result = el;
-    }
-    // Returns null if the event is directly on the container,
-    // or the element was filtered out for any reason.
-    if (result &&
-            result !== placeholderEl &&
-            (!options.draggableSelector || result.matches(options.draggableSelector)) &&
-            (handleFound || !options.handleSelector))
-        return result;
-    else {
-        return null;
-    }
-}
-
-const eventListenerOptionsArg = {passive: false, capture: false};
-
-// A subset of correct pairings. This is necessary to allow handlers taking the
-// specific subtype of Event.
-type ListenerPair =
-    ['touchstart'|'touchmove'|'touchend'|'touchcancel', (e: TouchEvent) => void]|
-    ['mousedown'|'mousemove'|'mouseup'|'mouseenter'|'mouseleave', (e: MouseEvent) => void]|
-    ['pointerdown'|'pointermove'|'pointerup'|'pointercancel'|'pointerenter'|'pointerleave', (e: PointerEvent) => void]|
-    ['dragover', (e: DragEvent) => void]|
-    ['selectstart', EventListenerOrEventListenerObject];
-
-function toggleListeners(
-        toggleOn: boolean,
-        element: HTMLElement|Document,
-        eventHandlerPairs: ListenerPair[]) {
-    const toggle =
-        toggleOn ? HTMLElement.prototype.addEventListener : HTMLElement.prototype.removeEventListener;
-    for (const [eventName, handler] of eventHandlerPairs) {
-        toggle.call(element, eventName, handler as EventListener, eventListenerOptionsArg);
-    }
+    return floatEl;
 }
 
 export default {

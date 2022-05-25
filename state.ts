@@ -51,6 +51,11 @@ type BaseDragState = {
   pickupPointerPos: Vec2D
   // Most recent pointer position.
   currentPointerPos: Vec2D
+  // Offset from current cursor pos to expected left-top of floatEl (when
+  // present). This is slightly different from just computing it from
+  // pickupPointerPos and initialPickupRect, as it includes some extra offset
+  // added from "snap out" effect.
+  floatFromPointerOffset: Vec2D
   // Current scale factor for floatEl. Set from floatElScale option of original
   // container.
   // This value is added as scale(floatElScale) to floatEl's CSS transform.
@@ -59,17 +64,17 @@ type BaseDragState = {
   forbiddenIndices: ForbiddenIndices
 };
 
-type PreDragState = BaseDragState & {
+export type PreDragState = BaseDragState & {
   state: StateEnum.PreDrag
   // Pre-drag timeout measures the delay in the preDrag phase.
   // This is the id value returned by setTimeout.
   preDragTimeoutId: number
   // Stubs of some common fields so that they are defined on DragState.
-  floatEl: undefined
-  to: undefined
+  floatEl?: undefined
+  to?: undefined
 };
 
-type PendingDragState = BaseDragState & {
+export type PendingDragState = BaseDragState & {
   state: StateEnum.PendingDrag
   // Current target container and index + placeholder information.
   to?: InsertionPlaceCandidate
@@ -83,7 +88,7 @@ type PendingDragState = BaseDragState & {
   floatEl: HTMLElement
 };
 
-type AfterDragState = BaseDragState & {
+export type AfterDragState = BaseDragState & {
   state: StateEnum.AfterDrag
   // Either pickedEl after being inserted into target
   // (or not moved at all, in case of failed drag)
@@ -93,7 +98,7 @@ type AfterDragState = BaseDragState & {
   to?: InsertionPlaceCandidate
 };
 
-type DragState = PreDragState | PendingDragState | AfterDragState;
+export type DragState = PreDragState | PendingDragState | AfterDragState;
 
 // Perhaps it would be better to write these assertions inline, and let
 // Typescript figure out that they are, indeed, correct.
