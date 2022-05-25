@@ -34,6 +34,8 @@ type BaseDragState = {
 type PreDragState = BaseDragState & {
   state: StateEnum.PreDrag
   preDragTimeoutId: number
+  floatEl: undefined
+  to: undefined
 };
 
 type PendingDragState = BaseDragState & {
@@ -47,7 +49,7 @@ type AfterDragState = BaseDragState & {
   state: StateEnum.AfterDrag
   insertedEl: HTMLElement
   floatEl: HTMLElement
-  // to: ItemPlace
+  to?: InsertionPlaceCandidate
 };
 
 // TODO: Scrollers

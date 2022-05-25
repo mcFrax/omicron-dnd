@@ -1,5 +1,5 @@
 
-const animMs = 100;
+export const animMs = 100;
 
 // Id returned by requestAnimationFrame. Always reset to 0 when no frame is
 // requested.
