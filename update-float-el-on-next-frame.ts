@@ -20,7 +20,7 @@ function animationFrame(timestamp: DOMHighResTimeStamp) {
     }
 }
 
-export function uploadFloatElOnNextFrame() {
+export function updateFloatElOnNextFrame() {
     if (!animFrameRequestId) {
         animFrameRequestId = requestAnimationFrame(animationFrame);
     }

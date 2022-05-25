@@ -60,6 +60,9 @@ type BaseDragState = {
   // container.
   // This value is added as scale(floatElScale) to floatEl's CSS transform.
   floatElScale: number
+  // Minimal (euclidean, px) distance the pointer needs to move from the initial
+  // position to trigger the drag before delay ends. Not applied for touch drag.
+  minimalMoveMouse: number
   // Forbidden indices cache.
   forbiddenIndices: ForbiddenIndices
 };

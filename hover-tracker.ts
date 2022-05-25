@@ -9,6 +9,10 @@ import { ContainerData } from "./expando";
 // Sorted from the deepest to most shallow in the DOM tree.
 export const hoverContainersByDepth: ContainerData[] = [];
 
+export function getHoverContainersDeeperThan(domDepth: number) {
+  return hoverContainersByDepth.filter((container) => container.domDepth > domDepth);
+}
+
 export function containerHoverEntered(containerData: ContainerData) {
     containerData.domDepth = getDomDepth(containerData.el);
     if (hoverContainersByDepth.indexOf(containerData) === -1) {

@@ -2,21 +2,18 @@
 import { Anim } from "./anims";
 import { EvPlace } from "./base-types";
 import { getItemFromContainerEvent, getItemsInContainerEndIndex, hasContainerAncestor } from "./dom-traversal";
-import { cancelIfCancellable, cancelIfOmicronActive } from "./event-utils";
+import { cancelIfCancellable, cancelIfOmicronActive, toggleListeners } from "./event-utils";
 import { ContainerEl, expando } from "./expando";
 import { DragKind } from "./external-types";
 import ForbiddenIndices from "./forbidden-indices";
+import { getHoverContainersDeeperThan } from "./hover-tracker";
 import { makeInvisible } from "./invisible-item";
 import { ContainerOptions } from "./options";
 import { disableOverscrollBehavior } from "./overscroll-behavior";
 import { globalDisableSelection } from "./selection-control";
-import { dragState, PreDragState, setDragState, StateEnum } from "./state";
+import { dragState, PendingDragState, PreDragState, setDragState, StateEnum } from "./state";
+import { updateFloatElOnNextFrame } from "./update-float-el-on-next-frame";
 
-
-// The direction of the last pointer move in y-coordinates.
-// -1 when going up (lower y value), +1 when going down.
-// The last value is kept as long as the y-coord doesn't change.
-let yDirection = -1;
 
 function initDragContainer(containerEl: HTMLElement, options: Partial<ContainerOptions>) {
     if (containerEl[expando]) {
@@ -205,11 +202,11 @@ function anyState_container_PointerDown(event: PointerEvent) {
         floatFromPointerOffset,
         currentPointerPos: pickupPointerPos,
         floatElScale: containerOptions.floatElScale,
+        minimalMoveMouse: containerOptions.minimalMoveMouse,
         forbiddenIndices: new ForbiddenIndices(),
         preDragTimeoutId,
     });
 }
-
 function startDrag() {
     if (dragState?.state !== StateEnum.PreDrag) return;
     // In case this was triggered by mouse, and not by the timeout itsef, we
@@ -284,7 +281,7 @@ function startDrag() {
     });
 }
 function statePreDrag_window_TouchStart(event: TouchEvent) {
-    if (activeEl && event.touches.length !== 1) {
+    if (dragState && event.touches.length !== 1) {
         // We don't allow multi-touch during drag.
         exitDrag(false);
     }
@@ -300,20 +297,25 @@ function statePreDrag_window_TouchEndOrCancel(event: TouchEvent) {
     // hence no preventDefault() call here.
 }
 function statePreDrag_window_PointerMove(event: PointerEvent) {
-    if (event.pointerId !== pointerId) {
+    if (dragState?.state !== StateEnum.PreDrag ||
+            event.pointerId !== dragState.pointerId) {
         return;
     }
-    xLast = event.clientX;
-    yLast = event.clientY;
-    let xDiff = xLast - xInitial;
-    let yDiff = xLast - xInitial;
+
+    const newX = dragState.currentPointerPos.x = event.clientX;
+    const newY = dragState.currentPointerPos.y = event.clientY;
+    let xDiff = newX - dragState.pickupPointerPos.x;
+    let yDiff = newY - dragState.pickupPointerPos.y;
+
     let distanceSquaredFromInitial = xDiff * xDiff + yDiff * yDiff;
+    const minimalMoveMouse = dragState.minimalMoveMouse;
     if (distanceSquaredFromInitial >  minimalMoveMouse * minimalMoveMouse) {
         startDrag();
     }
 }
 function statePreDrag_window_PointerUpOrCancel(event: PointerEvent) {
-    if (event.pointerId !== pointerId) {
+    if (dragState?.state !== StateEnum.PreDrag ||
+            event.pointerId !== dragState.pointerId) {
         return;
     }
     exitDrag(false);
@@ -337,43 +339,42 @@ function stateDrag_window_TouchMove(event: TouchEvent) {
     handleMove(event.touches.item(0) as Touch);
 }
 function stateDrag_window_PointerMove(event: PointerEvent) {
-    if (event.pointerId !== pointerId) {
+    if (event.pointerId !== dragState?.pointerId) {
         return;
     }
 
     handleMove(event);
 }
 
+// The direction of the last pointer move in y-coordinates.
+// -1 when going up (lower y value), +1 when going down.
+// The last value is kept as long as the y-coord doesn't change.
+let yDirection = -1;
+
 // This is to be called only when the pointer actually moves.
 function handleMove(evtPoint: EvPlace) {
+    if (dragState?.state !== StateEnum.PendingDrag) {
+      return;
+    }
     // Update the mouse position.
-    if (evtPoint.clientY !== yLast) {
-        yDirection = evtPoint.clientY > yLast ? 1 : -1;
+    if (evtPoint.clientY !== dragState.currentPointerPos.y) {
+        yDirection = evtPoint.clientY > dragState.currentPointerPos.y ? 1 : -1;
     }
-    xLast = evtPoint.clientX;
-    yLast = evtPoint.clientY;
-    xDragClientPos = xLast + xCursorOffset;
-    yDragClientPos = yLast + yCursorOffset;
+    dragState.currentPointerPos.x = evtPoint.clientX;
+    dragState.currentPointerPos.y = evtPoint.clientY;
 
-    // Update the position of floatEl before the next frame.
-    if (!animFrameRequestId) {
-        animFrameRequestId = requestAnimationFrame(animationFrame);
-    }
+    updateFloatElOnNextFrame();
 
-    updateOnMove(evtPoint);
+    updateOnMove(dragState, evtPoint);
 }
 
 // This is to be called both when pointer moves, and to invoke synthetic update
 // after scroll.
-function updateOnMove(evtPoint: EvPlace) {
+function updateOnMove(dragState: PendingDragState, evtPoint: EvPlace) {
     // If we are hovering over some containers that are descendants
     // of toEl but we didn't enter them yet for any reason, let's reconsider.
-    const toElDomDepth = toEl ? (toEl as any)[expando].domDepth : -1;
-    for (let i = 0; i < hoverContainersByDepth.length; ++i) {
-        if (hoverContainersByDepth[i].domDepth <= toElDomDepth) {
-            // Not looking at toEl or ancestors.
-            break;
-        }
+    const toElDomDepth = dragState.to ? dragState.to.containerEl[expando].domDepth : -1;
+    for (const hoverContainer of getHoverContainersDeeperThan(toElDomDepth)) {
         if (maybeEnterContainer(hoverContainersByDepth[i], evtPoint)) {
             // enterContainer took take care of handling the new position
             // and animation, so our work here is done.
@@ -381,9 +382,17 @@ function updateOnMove(evtPoint: EvPlace) {
         }
     }
 
-    if (!toEl) {
+    if (!dragState.to) {
         return;
     }
+
+    ////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////
+    ////
+    ////  I GOT ABOUT HERE RECENTLY
+    ////
+    ////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////
 
     updateActiveScrollers();
 
