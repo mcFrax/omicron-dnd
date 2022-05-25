@@ -38,6 +38,18 @@ export class ContainerOptions {
     handleSelector: string|null = null;
     allowPull: DragKind|false = DragKind.Move;
     allowDrop: Boolean = true;
+    // Minimal (euclidean, px) distance the pointer needs to move from the initial
+    // position to trigger the drag before delay ends. Not applied for touch drag.
+    minimalMoveMouse: number = 5
+    // Exact length of the preDrag phase for touch, and maximal for other pointers.
+    // For touch, this is a minimal time between pointerdown and the first touchmove
+    // to start the drag. If a touchmove/touchend/touchcancel happens earlier,
+    // the drag is cancelled, otherwise the drag starts `delay` ms after the initial
+    // pointerdown event.
+    // For mouse/pen, the drag starts _at the latest_ `delay` ms after the initial
+    // pointerdown, unless the pointer is released (pointerup). The drag can start
+    // earlier, if the pointer moves minimalMoveMouse px or more from initial point.
+    delay: number = 220
     // Enter guards define the area of the container that may be used to drag
     // elements into it. After the container was entered (became toEl) the whole
     // area can be used to drag the item inside the container.

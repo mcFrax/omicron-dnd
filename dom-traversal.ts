@@ -1,4 +1,5 @@
 
+import { expando } from "./expando";
 import { ContainerOptions } from "./options";
 import { dragState } from "./state";
 
@@ -67,4 +68,13 @@ export function getItemFromContainerEvent(event: Event, options: ContainerOption
     else {
         return null;
     }
+}
+
+export function hasContainerAncestor(element: HTMLElement) {
+    for (let el = element.parentElement; el; el = el.parentElement) {
+        if (expando in el) {
+            return true;
+        }
+    }
+    return false;
 }
