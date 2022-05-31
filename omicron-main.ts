@@ -1,19 +1,20 @@
 
 import { animateMoveInsideContainer } from "./animate-move";
-import { Anim } from "./anims";
+import { Anim, animMs, transformsByElem } from "./anims";
 import { EvPlace } from "./base-types";
-import { getItemFromContainerEvent, getItemsInContainerEndIndex, hasContainerAncestor } from "./dom-traversal";
+import { preventImmediateClick } from "./click-blocker";
+import { getItemFromContainerEvent, getItemsInContainerEndIndex, getItemsInContainerStartIndex, hasContainerAncestor } from "./dom-traversal";
 import { cancelIfCancellable, cancelIfOmicronActive, toggleListeners } from "./event-utils";
 import { ContainerEl, expando } from "./expando";
-import { DragKind } from "./external-types";
+import { DragEndEvent, DragKind } from "./external-types";
 import ForbiddenIndices from "./forbidden-indices";
 import { getHoverContainersDeeperThan } from "./hover-tracker";
 import { insertionIndexFromEventualIndex } from "./index-conversions";
-import { makeInvisible } from "./invisible-item";
+import { cancelInvisible, makeInvisible } from "./invisible-item";
 import { ContainerOptions } from "./options";
-import { disableOverscrollBehavior } from "./overscroll-behavior";
+import { disableOverscrollBehavior, revertOverscrollBehavior } from "./overscroll-behavior";
 import { updateActiveScrollers } from "./scrollers";
-import { globalDisableSelection } from "./selection-control";
+import { disableUserSelectOnBody, revertUserSelectOnBody } from "./selection-control";
 import { BadStateError, dragState, PendingDragState, PreDragState, setDragState, StateEnum } from "./state";
 import { updateFloatElOnNextFrame } from "./update-float-el-on-next-frame";
 
@@ -181,7 +182,7 @@ function anyState_container_PointerDown(event: PointerEvent) {
         containerOptions.onPreDragStart(containerEl, pickedEl, event);
     }
 
-    globalDisableSelection();
+    disableUserSelectOnBody();
 
     // Ensure the element has pointer capture. This happens automatically
     // for touch, but not for mouse.
@@ -211,7 +212,7 @@ function anyState_container_PointerDown(event: PointerEvent) {
     });
 }
 function startDrag() {
-    if (dragState?.state !== StateEnum.PreDrag) throw new  BadStateError(StateEnum.PreDrag);
+    if (dragState?.state !== StateEnum.PreDrag) throw new BadStateError(StateEnum.PreDrag);
     // In case this was triggered by mouse, and not by the timeout itsef, we
     // cancel the timeout.
     clearTimeout(dragState.preDragTimeoutId);
@@ -280,6 +281,10 @@ function startDrag() {
         ...dragState,
         state: StateEnum.PendingDrag,
         floatEl,
+        floatElPos: {
+            x: dragState.currentPointerPos.x + dragState.floatFromPointerOffset.x,
+            y: dragState.currentPointerPos.y + dragState.floatFromPointerOffset.y,
+        },
     });
 
     // Synthethic update, to determine the insertion point.
@@ -306,7 +311,7 @@ function statePreDrag_window_TouchEndOrCancel(event: TouchEvent) {
     // hence no preventDefault() call here.
 }
 function statePreDrag_window_PointerMove(event: PointerEvent) {
-    if (dragState?.state !== StateEnum.PreDrag) throw new  BadStateError(StateEnum.PreDrag);
+    if (dragState?.state !== StateEnum.PreDrag) throw new BadStateError(StateEnum.PreDrag);
     if (event.pointerId !== dragState.pointerId) {
         return;
     }
@@ -323,7 +328,7 @@ function statePreDrag_window_PointerMove(event: PointerEvent) {
     }
 }
 function statePreDrag_window_PointerUpOrCancel(event: PointerEvent) {
-    if (dragState?.state !== StateEnum.PreDrag) throw new  BadStateError(StateEnum.PreDrag);
+    if (dragState?.state !== StateEnum.PreDrag) throw new BadStateError(StateEnum.PreDrag);
     if (event.pointerId !== dragState.pointerId) {
         return;
     }
@@ -362,13 +367,18 @@ let yDirection = -1;
 
 // This is to be called only when the pointer actually moves.
 function handleMove(evtPoint: EvPlace) {
-    if (dragState?.state !== StateEnum.PendingDrag) throw new  BadStateError(StateEnum.PendingDrag);
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     // Update the mouse position.
     if (evtPoint.clientY !== dragState.currentPointerPos.y) {
         yDirection = evtPoint.clientY > dragState.currentPointerPos.y ? 1 : -1;
     }
     dragState.currentPointerPos.x = evtPoint.clientX;
     dragState.currentPointerPos.y = evtPoint.clientY;
+
+    dragState.floatElPos.x =
+        dragState.currentPointerPos.x + dragState.floatFromPointerOffset.x;
+    dragState.floatElPos.y =
+        dragState.currentPointerPos.y + dragState.floatFromPointerOffset.y;
 
     updateFloatElOnNextFrame();
 
@@ -378,7 +388,7 @@ function handleMove(evtPoint: EvPlace) {
 // This is to be called both when pointer moves, and to invoke synthetic update
 // after scroll and on drag start.
 function updateOnMove(evtPoint: EvPlace) {
-    if (dragState?.state !== StateEnum.PendingDrag) throw new  BadStateError(StateEnum.PendingDrag);
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     // If we are hovering over some containers that are descendants
     // of toEl but we didn't enter them yet for any reason, let's reconsider.
     const toElDomDepth = dragState.to ? dragState.to.containerEl[expando].domDepth : -1;
@@ -415,35 +425,55 @@ function updateOnMove(evtPoint: EvPlace) {
 // precomputed zone where we know no move happened. When insertionContainer
 // is supplied, we ignore both optimizations.
 function findUpdatedEventualIndex(containerEl: HTMLElement, evtPoint: EvPlace): number {
-    if ()
-    let ignoreCurrentNewIndex = Boolean(insertionContainer);
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
+    let ignoreCurrentNewIndex = containerEl !== dragState.to?.containerEl;
     // TODO: There is some glitch in how mouseY works after autoscroll.
     // I don't know what the issue is, but there is some shift introduced,
     // perhaps at this place.
     let mouseY = evtPoint.clientY - containerEl.getClientRects()[0].top;
 
-    let updatedNewIndex = newIndex;
+    let insIndexBefore = dragState.to?.eventualIndex ?? 0;
+    let updatedNewIndex = insIndexBefore;
+    const {yStartNoMoveZone, yEndNoMoveZone} = dragState.to ?? {
+        yStartNoMoveZone: Infinity,
+        yEndNoMoveZone: -Infinity,
+    };
+    const {
+        containerEl: fromEl,
+        index: fromIndex,
+    } = dragState.from;
+    const isMove = dragState.dragKind === DragKind.Move;
+
+    // TODO: Extract, deduplicate, cache.
+    const activeElHeight = dragState.pickedEl.offsetHeight;
+    // Note: placeholderEl may be in a different container, so it's height may
+    // be completely broken here. It shouldn't matter, though, as we won't be
+    // using it in that case.
+    const activeToPlaceholderOffset =
+        dragState.to ? dragState.to.placeholderEl.offsetHeight - activeElHeight : 0;
+    const activeToNothingOffset = -activeElHeight - 8;
+    const nothingToPlaceholderOffset = dragState.to?.placeholderEl.offsetHeight ?? 0;
 
     let wiggleZoneSize = 0.5;
     let snapMargin = (1 - wiggleZoneSize) / 2;
     let bottomSnapBorder = yDirection === -1 ? (1 - snapMargin) : snapMargin;
-    let startIndex = getItemsInContainerStart(containerEl);
-    let endIndex = getItemsInContainerEnd(containerEl);
-    if (ignoreCurrentNewIndex || mouseY < yStartNoMoveZone && newIndex !== 0) {
+    let startIndex = getItemsInContainerStartIndex(containerEl);
+    let endIndex = getItemsInContainerEndIndex(containerEl);
+    if (ignoreCurrentNewIndex || (mouseY < yStartNoMoveZone && updatedNewIndex !== 0)) {
         // Correct for the fact that if we dragged the element down from
         // its place, some elements above it are shifted from their
         // offset position.
-        let offsetCorrection = containerEl === fromEl && dragKind === DragKind.Move ? activeToNothingOffset : 0;
+        let offsetCorrection = containerEl === dragState.from.containerEl && isMove ? activeToNothingOffset : 0;
         updatedNewIndex = startIndex;
         // We may look up one extra element at the start, but that is not an issue.
         let iterationStart = endIndex - 1;
-        if (!ignoreCurrentNewIndex && newIndex < iterationStart) {
-            iterationStart = newIndex;
+        if (!ignoreCurrentNewIndex && insIndexBefore < iterationStart) {
+            iterationStart = insIndexBefore;
         }
         for (let i = iterationStart; i >= startIndex; --i) {
             let otherEl = containerEl.children[i] as HTMLElement;
-            if (otherEl === activeEl && dragKind === DragKind.Move) continue;
-            if (i < oldIndex) {
+            if (otherEl === dragState.pickedEl && isMove) continue;
+            if (i < fromIndex) {
                 // We could check for (toEl === fromEl) here, but the
                 // value is going to be 0 anyway.
                 offsetCorrection = 0;
@@ -455,7 +485,7 @@ function findUpdatedEventualIndex(containerEl: HTMLElement, evtPoint: EvPlace): 
             let otherHeight = otherEl.offsetHeight;
             if (mouseY > otherTop + bottomSnapBorder * otherHeight) {
                 // Insert activeEl after otherEl.
-                if (containerEl === fromEl && dragKind === DragKind.Move && i > oldIndex) {
+                if (containerEl === fromEl && isMove && i > fromIndex) {
                     // Special new case. otherEl will be moved up
                     // and end up with index i-1, so inserting after
                     // it means we will end up with index i.
@@ -470,12 +500,12 @@ function findUpdatedEventualIndex(containerEl: HTMLElement, evtPoint: EvPlace): 
         let offsetCorrection = nothingToPlaceholderOffset;
         // Set to the highest possible value - in case we are at the very
         // bottom of the container.
-        updatedNewIndex = (containerEl === fromEl && dragKind === DragKind.Move) ? endIndex - 1 : endIndex;
+        updatedNewIndex = (containerEl === fromEl && isMove) ? endIndex - 1 : endIndex;
         // We may look up one extra element at the start, but that is not an issue.
-        for (let i = newIndex; i < endIndex; ++i) {
+        for (let i = insIndexBefore; i < endIndex; ++i) {
             let otherEl = containerEl.children[i] as HTMLElement;
-            if (otherEl === activeEl && dragKind === DragKind.Move) continue;  // May still happen.
-            if (i > oldIndex && containerEl === fromEl && dragKind === DragKind.Move) {
+            if (otherEl === dragState.pickedEl && isMove) continue;  // May still happen.
+            if (i > fromIndex && containerEl === fromEl && isMove) {
                 offsetCorrection = activeToPlaceholderOffset;
             }
             if (getComputedStyle(otherEl).display === 'none') {
@@ -485,7 +515,7 @@ function findUpdatedEventualIndex(containerEl: HTMLElement, evtPoint: EvPlace): 
             let otherHeight = otherEl.offsetHeight;
             if (mouseY < otherTop + bottomSnapBorder * otherHeight) {
                 // Insert activeEl before otherEl.
-                if (containerEl === fromEl && dragKind === DragKind.Move && i > oldIndex) {
+                if (containerEl === fromEl && isMove && i > fromIndex) {
                     // Special new case. otherEl won't be bumped to i+1
                     // but instead back to i-th position when we
                     // re-insert activeEl, so the inserting splice
@@ -502,20 +532,36 @@ function findUpdatedEventualIndex(containerEl: HTMLElement, evtPoint: EvPlace): 
 }
 
 function setPlaceholderAndNoMoveZone(): void {
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
+    if (!dragState.to) return;
     let newPlaceholderTop = findPlaceholderTop();
-    yStartNoMoveZone = newPlaceholderTop - 8;
-    yEndNoMoveZone = newPlaceholderTop - nothingToPlaceholderOffset;
-    if (placeholderEl) {
-        placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
-    }
+    // TODO: Extract, deduplicate, cache, correct margins.
+    const nothingToPlaceholderOffset = dragState.to.placeholderEl.offsetHeight;
+    dragState.to.yStartNoMoveZone = newPlaceholderTop - 8;
+    dragState.to.yEndNoMoveZone = newPlaceholderTop - nothingToPlaceholderOffset;
+    dragState.to.placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
 }
 
 function findPlaceholderTop(): number {
-    if (!toEl) {
-        return 0;
-    }
-    let startIndex = getItemsInContainerStart(toEl);
-    let endIndex = getItemsInContainerEnd(toEl);
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
+    if (!dragState.to) return 0;
+
+    const {
+        containerEl: fromEl,
+        index: oldIndex,
+    } = dragState.from;
+    const {
+        containerEl: toEl,
+        eventualIndex,
+    } = dragState.to;
+    const isMove = dragState.dragKind === DragKind.Move;
+
+    // TODO: Extract, deduplicate, cache.
+    const activeElHeight = dragState.pickedEl.offsetHeight;
+    const activeToNothingOffset = -activeElHeight - 8;
+
+    let startIndex = getItemsInContainerStartIndex(toEl);
+    let endIndex = getItemsInContainerEndIndex(toEl);
     let ref: HTMLElement|null, offsetCorrection: number;
     if (endIndex === startIndex) {
         // We don't have any reference, it will just be at the top.
@@ -523,21 +569,21 @@ function findPlaceholderTop(): number {
         // margin/padding.
         ref = null;
         offsetCorrection = 0;
-    } else if (toEl === fromEl && dragKind === DragKind.Move && newIndex === endIndex - 1) {
+    } else if (toEl === fromEl && isMove && eventualIndex === endIndex - 1) {
         // Last element in fromEl.
         ref = toEl.children[endIndex-1] as HTMLElement;
         // Position the placeholder _after_ the ref.
         offsetCorrection = ref.offsetHeight + 8 + activeToNothingOffset;
-    } else if ((toEl !== fromEl || dragKind !== DragKind.Move) && newIndex === endIndex) {
+    } else if ((toEl !== fromEl || !isMove) && eventualIndex === endIndex) {
         // Last element, not in fromEl.
         ref = toEl.children[endIndex-1] as HTMLElement;
         // Position the placeholder _after_ the ref.
         offsetCorrection = ref.offsetHeight + 8;
-    } else if (toEl === fromEl && dragKind === DragKind.Move && newIndex > oldIndex) {
-        ref = toEl.children[newIndex + 1] as HTMLElement
+    } else if (toEl === fromEl && isMove && eventualIndex > oldIndex) {
+        ref = toEl.children[eventualIndex + 1] as HTMLElement
         offsetCorrection = activeToNothingOffset;
     } else {
-        ref = toEl.children[newIndex] as HTMLElement
+        ref = toEl.children[eventualIndex] as HTMLElement
         offsetCorrection = 0;
     }
     // Correct the ref if we hit an element with display: none.
@@ -552,75 +598,83 @@ function findPlaceholderTop(): number {
 }
 
 function stateDrag_window_TouchCancel(event: TouchEvent) {
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     exitDrag(false);
 }
 function stateDrag_window_TouchEnd(event: TouchEvent) {
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     dragEndedWithRelease();
     event.preventDefault();
     event.stopPropagation();
 }
 function stateDrag_window_PointerCancel(event: PointerEvent) {
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     exitDrag(false);
 }
 function stateDrag_window_PointerUp(event: PointerEvent) {
-    if (event.pointerId !== pointerId) {
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
+    if (event.pointerId !== dragState.pointerId) {
         return;
     }
     dragEndedWithRelease();
 }
 
 function dragEndedWithRelease() {
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     // We can't really prevent the browser for generating a click, but we
-    // can capture it.
-    document.addEventListener('click', preventNextClick, true);
-    // The click will, however, not necessaily generate (only when there
-    // was an element that browser thinks was clicked), so let's make sure
-    // the blocker is removed.
-    setTimeout(removeClickBlocker, 0);
+    // can capture it. The click will, however, not necessaily generate
+    // (only when there was an element that browser thinks was clicked), so
+    // we limit blocking to immediately generated events.
+    preventImmediateClick();
 
     // End drag successfully, except when we aren't actually in any container.
     // TODO: Should we have a special handling for touchcancel? OTOH, I don't
     // see it showing up in practice. Maybe except when touch becomes a scroll,
     // but we eliminate that instance.
-    exitDrag(toEl !== null);
-}
-
-function preventNextClick(event: MouseEvent) {
-    event.stopPropagation();
-    event.preventDefault();
-    document.removeEventListener('click', preventNextClick, true);
-}
-function removeClickBlocker() {
-    document.removeEventListener('click', preventNextClick, true);
+    exitDrag(Boolean(dragState.to));
 }
 
 function exitDrag(execSort: boolean) {
-    let floatElExisted = Boolean(floatEl);
-    let insertEl: HTMLElement|null = null;
-    if (floatEl) {
-        floatEl.remove();  // Removing this element now saves some special casing.
-        floatEl = null;
+    if (dragState?.state !== StateEnum.PreDrag &&
+            dragState?.state !== StateEnum.PendingDrag) {
+        throw new Error(`exitDrag called in wrong state: ${dragState?.state}`);
     }
-    if (placeholderEl) {
-        placeholderEl.remove();
-        placeholderEl = null;
+    if (execSort && !(dragState.state === StateEnum.PendingDrag && dragState.to)) {
+        console.error('Exit drag called with execSort==true, but conditions are not met.')
+        execSort = false;
     }
-    if (preDragTimeoutId) {
-        clearTimeout(preDragTimeoutId);
-        preDragTimeoutId = 0;
+    if (dragState.state == StateEnum.PendingDrag) {
+        dragState.floatEl.remove();  // Removing this element now saves some special casing.
+        if (dragState.to) {
+            dragState.to.placeholderEl.remove();
+        }
+    } else {
+        clearTimeout(dragState.preDragTimeoutId);
     }
 
-    let dragEndEvent: DragEndEvent = {
-        dragExecuted: execSort,
-        item: activeEl as HTMLElement,
-        from: fromEl as HTMLElement,
-        to: execSort ? toEl : null,
-        oldIndex,
-        newIndex: execSort ? newIndex : null,
-    };
+    let insertEl: HTMLElement | null = null;
+    let dragEndEvent: DragEndEvent | null;
 
     // Note: toEl is implied by execSort, but Typescript doesn't know that.
-    if (execSort && toEl && (newIndex !== oldIndex || toEl !== fromEl)) {
+    if (execSort &&
+            dragState.state === StateEnum.PendingDrag &&
+            dragState.to &&
+            (dragState.to.containerEl !== dragState.from.containerEl ||
+                dragState.to.eventualIndex !== dragState.from.index)
+    ) {
+        insertEl = (dragState.dragKind === DragKind.Move) ? dragState.pickedEl : dragState.pickedEl.cloneNode(true) as HTMLElement;
+        dragEndEvent = {
+            dragExecuted: true,
+            item: dragState.pickedEl,  // TODO: handle move differently.
+            from: dragState.from.containerEl,
+            fromIndex: dragState.from.index,
+            oldIndex: dragState.from.index,
+            to: dragState.to.containerEl,
+            eventualIndex: dragState.to.eventualIndex,
+            insertionIndex: dragState.to.insertionIndex,
+            newIndex: dragState.to.eventualIndex,
+        };
+
         // Note:
         // We need to adjust the position of elements with transform
         // to avoid shifting them around suddenly. It would be nice
@@ -628,12 +682,25 @@ function exitDrag(execSort: boolean) {
         // several cases and so on. I'll just do that as I go, and not
         // worry that I do that twice for some elements most of the time.
 
-        if (dragKind === DragKind.Move) {
-            activeEl.remove();
+        if (dragState.dragKind === DragKind.Move) {
+            dragState.pickedEl.remove();
         }
 
+        const {
+            containerEl: fromEl,
+            index: fromIndex,
+        } = dragState.from;
+        const {
+            containerEl: toEl,
+            eventualIndex,
+        } = dragState.to;
+
+        // TODO: Extract, deduplicate, cache.
+        const activeElHeight = dragState.pickedEl.offsetHeight;
+        const activeToNothingOffset = -activeElHeight - 8;
+
         // Adjust elements after removed and animate them to 0.
-        for (let elem of Array.from(fromEl.children).slice(oldIndex) as HTMLElement[]) {
+        for (let elem of Array.from(fromEl.children).slice(fromIndex) as HTMLElement[]) {
             let currentTransform = (transformsByElem.get(elem) || [0, 0]);
             currentTransform[1] -= activeToNothingOffset;
             if (currentTransform[0] !== 0 || currentTransform[1] !== 0) {
@@ -642,15 +709,18 @@ function exitDrag(execSort: boolean) {
             Anim.start(fromEl, [elem], 0, animMs, currentTransform[1]);
         }
 
-        insertEl = (dragKind === DragKind.Move) ? activeEl : activeEl.cloneNode(true) as HTMLElement;
-        if (newIndex === toEl.children.length) {
+        // Remove placeholder.
+        dragState.to.placeholderEl.remove();
+
+        // We removed pickedEl before, so now we insert simply at eventualIndex.
+        if (eventualIndex === toEl.children.length) {
             toEl.appendChild(insertEl);
         } else {
-            toEl.children[newIndex].before(insertEl);
+            toEl.children[eventualIndex].before(insertEl);
         }
 
         // Adjust elements after inserted and animate them to 0.
-        for (let elem of Array.from(toEl.children).slice(newIndex + 1) as HTMLElement[]) {
+        for (let elem of Array.from(toEl.children).slice(eventualIndex + 1) as HTMLElement[]) {
             let currentTransform = (transformsByElem.get(elem) || [0, 0]);
             currentTransform[1] += activeToNothingOffset;
             if (currentTransform[0] !== 0 || currentTransform[1] !== 0) {
@@ -659,70 +729,56 @@ function exitDrag(execSort: boolean) {
             Anim.start(fromEl, [elem], 0, animMs, currentTransform[1]);
         }
     } else {
+        dragEndEvent = {
+            dragExecuted: false,
+            item: dragState.pickedEl,  // TODO: handle move differently.
+            from: dragState.from.containerEl,
+            fromIndex: dragState.from.index,
+            oldIndex: dragState.from.index,
+        };
+
         // When cancelling, let's simply tell everyone to go home.
-        for (let cont of [fromEl, toEl]) {
-            if (cont !== null) {  // toEl may be missing.
+        for (let cont of [dragState.from.containerEl, dragState.to?.containerEl]) {
+            if (cont) {  // toEl may be missing.
                 Anim.start(cont, Array.from(cont.children) as HTMLElement[], 0, animMs);
             }
         }
     }
 
-    if (floatElExisted) {
-        let animElem = insertEl || activeEl;
+    cancelInvisible(dragState.pickedEl);
+
+    if (dragState.state == StateEnum.PendingDrag) {
+        let animElem = insertEl ?? dragState.pickedEl;
         // Our Anim handles only y animation for now, we should fix that.
         // However, let's at least handle the y.
         let destRect = animElem.getClientRects()[0];
-        Anim.start(animElem, [animElem], 0, animMs, yDragClientPos - destRect.top);
-    }
+        Anim.start(animElem, [animElem], 0, animMs, dragState.floatElPos.y - destRect.top);
 
-    unstyleActiveEl();
-    deactivatePlaceholder();
+        if (dragState.to) {
+            removeBottomPaddingCorrection();
 
-    removeBottomPaddingCorrection();
-
-    if (toEl) {
-        // Invoke onContainerLeft here to be consistent with how it's called
-        // in leaveContainer - after the container cleanup.
-        const containerData = (toEl as any)[expando] as ContainerData;
-        const toContainerOptions = containerData.options;
-        if (typeof toContainerOptions.onContainerLeft === 'function') {
-            toContainerOptions.onContainerLeft(toEl, activeEl);
+            // Invoke onContainerLeft here to be consistent with how it's called
+            // in leaveContainer - after the container cleanup.
+            const toContainerOptions = dragState.to.containerEl[expando].options;
+            if (typeof toContainerOptions.onContainerLeft === 'function') {
+                toContainerOptions.onContainerLeft(dragState.to.containerEl, dragState.pickedEl);
+            }
         }
     }
 
-    toggleEvents_statePreDrag(false);
-    toggleEvents_stateDrag(false);
+    toggleEvents_statePreDrag(false, dragState.touchDrag);
+    toggleEvents_stateDrag(false, dragState.touchDrag);
 
-    // Revert the original overscroll behavior.
-    // TODO: Don't, if we didn't store it first.
-    document.documentElement.style.overscrollBehavior = htmlOvescrollBehavior;
-    document.body.style.overscrollBehavior = bodyOvescrollBehavior;
+    revertOverscrollBehavior();
+    revertUserSelectOnBody();
 
-    // Revert user-select on document.body.
-    document.body.style.userSelect = bodyUserSelect;
-    document.body.style.webkitUserSelect = bodyWebkitUserSelect;
-    document.body.style.webkitTouchCallout = bodyWebkitTouchCallout;
-
-    pointerId = null;
-    pointerDownTarget = null;
-    activeEl = null;
-    floatEl = null;
-    fromEl = null;
-    toEl = null;
-    placeholderEl = null;
-    oldIndex = newIndex = 0;
-    yDirection = -1;
-    scrollers = [];
-    knownScrollers = new Map();
-    activeScrollers = [];
-    forbiddenInsertionIndicesCache = new Map();
-
+    setDragState(null);
 
     // Finally, let call all the drag-end events.
     // All the callbacks get the same event object.
     const fromContainerOptions = (dragEndEvent.from as any)[expando].options;
 
-    if (dragEndEvent.to) {
+    if (dragEndEvent.dragExecuted) {
         if (dragEndEvent.to === dragEndEvent.from) {
             if (typeof fromContainerOptions.onInternalChange === 'function') {
                 fromContainerOptions.onInternalChange(dragEndEvent);
@@ -963,16 +1019,19 @@ function deactivatePlaceholder() {
 }
 
 function addBottomPaddingCorrection() {
-    if (toEl !== fromEl) {
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
+    if (dragState.to && dragState.to.containerEl !== dragState.from.containerEl) {
+        const toEl = dragState.to.containerEl;
+        const nothingToPlaceholderOffset = dragState.to.placeholderEl.offsetHeight;
         toEl.style.paddingBottom =
             parseFloat(getComputedStyle(toEl).paddingBottom.slice(0, -2)) + nothingToPlaceholderOffset + 'px';
     }
 }
 
 function removeBottomPaddingCorrection() {
-    if (toEl !== null && toEl !== fromEl) {
-        // Reset extended padding.
-        toEl.style.paddingBottom = null;
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
+    if (dragState.to && dragState.to.containerEl !== dragState.from.containerEl) {
+        dragState.to.containerEl.style.paddingBottom = '';
     }
 }
 

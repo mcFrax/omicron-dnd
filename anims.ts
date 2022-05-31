@@ -21,7 +21,9 @@ let animsByElem: Map<HTMLElement, Anim> = new Map();
 // Most recent x and y values (in pixel) set in translate(x, y) part
 // of the CSS transform set on an element animated with Anim. If the transform
 //  is unset or set to translate(0, 0), no entry is stored.
-let transformsByElem: Map<HTMLElement, [number, number]>  = new Map();
+// TODO: Invent some better interface to tap into this information than just
+// exporting it.
+export let transformsByElem: Map<HTMLElement, [number, number]>  = new Map();
 
 function animationFrame(timestamp: DOMHighResTimeStamp) {
     animFrameRequestId = 0;  // Allow scheduling for the next frame.

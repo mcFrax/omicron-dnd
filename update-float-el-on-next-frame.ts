@@ -8,15 +8,7 @@ function animationFrame(timestamp: DOMHighResTimeStamp) {
     animFrameRequestId = 0;  // Allow scheduling for the next frame.
     if (dragState && dragState.state === StateEnum.PendingDrag) {
         // TODO: adjust for scroll or other changes of the base.
-        const floatPosX =
-            dragState.initialPickupRect.x +
-            dragState.currentPointerPos.x -
-            dragState.pickupPointerPos.x;
-        const floatPosY =
-            dragState.initialPickupRect.y +
-            dragState.currentPointerPos.y -
-            dragState.pickupPointerPos.y;
-        dragState.floatEl.style.transform = `translate(${floatPosX}px,${floatPosY}px) scale(${dragState.floatElScale})`;
+        dragState.floatEl.style.transform = `translate(${dragState.floatElPos.x}px,${dragState.floatElPos.y}px) scale(${dragState.floatElScale})`;
     }
 }
 

@@ -30,6 +30,7 @@ export function animateMoveInsideContainer(containerEl: HTMLElement, previousEve
 
     if (dragState?.state !== StateEnum.PendingDrag) return;
 
+    // TODO: Extract, deduplicate, cache.
     const activeElHeight = dragState.pickedEl.offsetHeight;
     const activeToPlaceholderOffset =
         dragState.to ? dragState.to.placeholderEl.offsetHeight - activeElHeight : 0;

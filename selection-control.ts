@@ -13,7 +13,7 @@ let saved: {
   bodyWebkitTouchCallout: string,
 } | null;
 
-export function globalDisableSelection() {
+export function disableUserSelectOnBody() {
   if (saved) return;
   saved = {
     bodyUserSelect: document.body.style.userSelect,
@@ -25,7 +25,7 @@ export function globalDisableSelection() {
   document.body.style.webkitTouchCallout = 'none';
 }
 
-export function globalRevertSelection() {
+export function revertUserSelectOnBody() {
   if (!saved) return;
   document.body.style.userSelect = saved.bodyUserSelect;
   document.body.style.webkitUserSelect = saved.bodyWebkitUserSelect;

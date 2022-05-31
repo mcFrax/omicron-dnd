@@ -6,6 +6,7 @@ import {
   Vec2D,
   ItemOriginalPlace,
   InsertionPlaceCandidate,
+  InsertionPlace,
 } from './base-types';
 import ForbiddenIndices from './forbidden-indices';
 
@@ -89,6 +90,7 @@ export type PendingDragState = BaseDragState & {
   // FUTURE COMPAT: It is likely that options to turn floatEl off or
   // use a custom function to create it will be added in the future.
   floatEl: HTMLElement
+  floatElPos: Vec2D
 };
 
 export type AfterDragState = BaseDragState & {
@@ -98,7 +100,7 @@ export type AfterDragState = BaseDragState & {
   // or it's clone inserted at the target place.
   insertedEl: HTMLElement
   floatEl: HTMLElement
-  to?: InsertionPlaceCandidate
+  to?: InsertionPlace
 };
 
 export type DragState = PreDragState | PendingDragState | AfterDragState;
