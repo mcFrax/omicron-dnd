@@ -118,6 +118,12 @@ export function isAfterDrag(state?: DragState): state is AfterDragState {
   return !!state && state.state === StateEnum.AfterDrag;
 }
 
+export class BadStateError extends Error {
+  constructor(expectedState: StateEnum) {
+    super(`Drag state assertion failed: expected state ${StateEnum[expectedState]}, but actual is ${dragState ? StateEnum[dragState.state] : '<no drag>'}`);
+  }
+}
+
 export let dragState: DragState|null = null;
 
 export function setDragState(newDragState: DragState|null) {

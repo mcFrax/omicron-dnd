@@ -4,7 +4,7 @@ import { DragKind } from "./external-types";
 import { dragState, StateEnum } from "./state";
 
 
-export function animateMoveInsideContainer(containerEl: HTMLElement, previousIndex: number, newNewIndex: number) {
+export function animateMoveInsideContainer(containerEl: HTMLElement, previousEventualIndex: number, newEventualIndex: number) {
     // There are 4 groups of elements, adjusted by different offsets:
     //
     // 1. no offset
@@ -38,9 +38,9 @@ export function animateMoveInsideContainer(containerEl: HTMLElement, previousInd
 
     let maxItemIndex = getItemsInContainerEndIndex(containerEl) - 1;
     let affectedStart =
-        Math.min(maxItemIndex, Math.min(newNewIndex, previousIndex));
+        Math.min(maxItemIndex, Math.min(newEventualIndex, previousEventualIndex));
     let affectedEnd =
-        Math.min(maxItemIndex, Math.max(newNewIndex, previousIndex));
+        Math.min(maxItemIndex, Math.max(newEventualIndex, previousEventualIndex));
 
     if (maxItemIndex === -1) {
     return; // Empty container, nothing to animate.
@@ -59,7 +59,7 @@ export function animateMoveInsideContainer(containerEl: HTMLElement, previousInd
             dragState.dragKind === DragKind.Move &&
             containerEl === dragState.from.containerEl &&
             i >= dragState.from.index);
-        let afterNew = afterOld ? i > newNewIndex : i >= newNewIndex;
+        let afterNew = afterOld ? i > newEventualIndex : i >= newEventualIndex;
 
         if (afterNew && afterOld) {
             Anim.start(containerEl, [otherEl], activeToPlaceholderOffset, animMs);

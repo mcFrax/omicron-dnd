@@ -1,4 +1,5 @@
 
+import { animateMoveInsideContainer } from "./animate-move";
 import { Anim } from "./anims";
 import { EvPlace } from "./base-types";
 import { getItemFromContainerEvent, getItemsInContainerEndIndex, hasContainerAncestor } from "./dom-traversal";
@@ -7,11 +8,13 @@ import { ContainerEl, expando } from "./expando";
 import { DragKind } from "./external-types";
 import ForbiddenIndices from "./forbidden-indices";
 import { getHoverContainersDeeperThan } from "./hover-tracker";
+import { insertionIndexFromEventualIndex } from "./index-conversions";
 import { makeInvisible } from "./invisible-item";
 import { ContainerOptions } from "./options";
 import { disableOverscrollBehavior } from "./overscroll-behavior";
+import { updateActiveScrollers } from "./scrollers";
 import { globalDisableSelection } from "./selection-control";
-import { dragState, PendingDragState, PreDragState, setDragState, StateEnum } from "./state";
+import { BadStateError, dragState, PendingDragState, PreDragState, setDragState, StateEnum } from "./state";
 import { updateFloatElOnNextFrame } from "./update-float-el-on-next-frame";
 
 
@@ -208,7 +211,7 @@ function anyState_container_PointerDown(event: PointerEvent) {
     });
 }
 function startDrag() {
-    if (dragState?.state !== StateEnum.PreDrag) return;
+    if (dragState?.state !== StateEnum.PreDrag) throw new  BadStateError(StateEnum.PreDrag);
     // In case this was triggered by mouse, and not by the timeout itsef, we
     // cancel the timeout.
     clearTimeout(dragState.preDragTimeoutId);
@@ -303,8 +306,8 @@ function statePreDrag_window_TouchEndOrCancel(event: TouchEvent) {
     // hence no preventDefault() call here.
 }
 function statePreDrag_window_PointerMove(event: PointerEvent) {
-    if (dragState?.state !== StateEnum.PreDrag ||
-            event.pointerId !== dragState.pointerId) {
+    if (dragState?.state !== StateEnum.PreDrag) throw new  BadStateError(StateEnum.PreDrag);
+    if (event.pointerId !== dragState.pointerId) {
         return;
     }
 
@@ -320,8 +323,8 @@ function statePreDrag_window_PointerMove(event: PointerEvent) {
     }
 }
 function statePreDrag_window_PointerUpOrCancel(event: PointerEvent) {
-    if (dragState?.state !== StateEnum.PreDrag ||
-            event.pointerId !== dragState.pointerId) {
+    if (dragState?.state !== StateEnum.PreDrag) throw new  BadStateError(StateEnum.PreDrag);
+    if (event.pointerId !== dragState.pointerId) {
         return;
     }
     exitDrag(false);
@@ -359,9 +362,7 @@ let yDirection = -1;
 
 // This is to be called only when the pointer actually moves.
 function handleMove(evtPoint: EvPlace) {
-    if (dragState?.state !== StateEnum.PendingDrag) {
-      return;
-    }
+    if (dragState?.state !== StateEnum.PendingDrag) throw new  BadStateError(StateEnum.PendingDrag);
     // Update the mouse position.
     if (evtPoint.clientY !== dragState.currentPointerPos.y) {
         yDirection = evtPoint.clientY > dragState.currentPointerPos.y ? 1 : -1;
@@ -375,9 +376,9 @@ function handleMove(evtPoint: EvPlace) {
 }
 
 // This is to be called both when pointer moves, and to invoke synthetic update
-// after scroll.
+// after scroll and on drag start.
 function updateOnMove(evtPoint: EvPlace) {
-    if (dragState?.state !== StateEnum.PendingDrag) return;
+    if (dragState?.state !== StateEnum.PendingDrag) throw new  BadStateError(StateEnum.PendingDrag);
     // If we are hovering over some containers that are descendants
     // of toEl but we didn't enter them yet for any reason, let's reconsider.
     const toElDomDepth = dragState.to ? dragState.to.containerEl[expando].domDepth : -1;
@@ -389,96 +390,23 @@ function updateOnMove(evtPoint: EvPlace) {
         }
     }
 
-    if (!dragState.to) {
+    const to = dragState.to;
+
+    if (!to) {
         return;
     }
 
-    ////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////
-    ////
-    ////  I GOT ABOUT HERE RECENTLY
-    ////
-    ////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////
-
     updateActiveScrollers();
 
-    let updatedNewIndex = findUpdatedNewIndex(evtPoint);
+    let updatedEventualIndex = findUpdatedEventualIndex(to.containerEl, evtPoint);
 
-    if (updatedNewIndex != newIndex && !isForbiddenIndex(toEl, updatedNewIndex)) {
-        let previousIndex = newIndex;
-        newIndex = updatedNewIndex;
-        animateMoveInsideContainer(toEl, previousIndex, updatedNewIndex);
+    if (updatedEventualIndex != to.insertionIndex && !dragState.forbiddenIndices.isForbiddenIndex(to.containerEl, dragState.pickedEl, updatedEventualIndex)) {
+        let previousEventualIndex = to.eventualIndex;
+        to.eventualIndex = updatedEventualIndex;
+        to.insertionIndex = insertionIndexFromEventualIndex(to.containerEl, updatedEventualIndex);
+        animateMoveInsideContainer(to.containerEl, previousEventualIndex, updatedEventualIndex);
 
         setPlaceholderAndNoMoveZone();
-    }
-}
-
-const scrollActivationMargin = 60; // In pixels. TODO: Allow adjusting with element markup.
-
-function updateActiveScrollers() {
-    // TODO: Remove array allocation?
-    activeScrollers = [];
-    for (let scroller of scrollers) {
-        if (scroller.horizontal) {
-            if (xLast < scroller.rect.left + scrollActivationMargin) {
-                // Scrolling left.
-                activateScroller(scroller, -1, 0,
-                    (scroller.rect.left + scrollActivationMargin - xLast) / scrollActivationMargin);
-            } else if (xLast > scroller.rect.right - scrollActivationMargin) {
-                // Scrolling right.
-                activateScroller(scroller, 1, 0,
-                    (xLast - scroller.rect.right + scrollActivationMargin) / scrollActivationMargin);
-            } else {
-                scroller.snapCooldown = false;
-            }
-        }
-        if (scroller.vertical) {
-            if (yLast < scroller.rect.top + scrollActivationMargin) {
-                // Scrolling up.
-                activateScroller(scroller, 0, -1,
-                    (scroller.rect.top + scrollActivationMargin - yLast) / scrollActivationMargin);
-            } else if (yLast > scroller.rect.bottom - scrollActivationMargin) {
-                // Scrolling down.
-                activateScroller(scroller, 0, 1,
-                    (yLast - scroller.rect.bottom + scrollActivationMargin) / scrollActivationMargin);
-            }
-        }
-    }
-    if (activeScrollers.length === 0) {
-        // Not animating (any more). Let the next animation know that it needs
-        // to count itself in, in case we didn't request previous frames.
-        lastScrollAnimationTimestamp = null;
-    } else {
-        // Request animation for the active scrollers.
-        if (!animFrameRequestId) {
-            animFrameRequestId = requestAnimationFrame(animationFrame);
-        }
-    }
-}
-
-// This is a helper for updateActiveScrollers, only to be called from there.
-function activateScroller(scroller: ScrollerRecord, horizontal: number, vertical: number, speedInput: number) {
-    if (scroller.snap) {
-        if (!scroller.snapCooldown) {
-            if (horizontal) {
-                scroller.el.scrollLeft += horizontal * scroller.el.clientWidth;
-            }
-            if (vertical) {
-                scroller.el.scrollTop += vertical * scroller.el.clientHeight;
-            }
-            scroller.snapCooldown = true; // Prevent immediate re-activation.
-        }
-        // TODO: Either force recomputing the rects for other scrollers after
-        // the scroll, or maybe just give up caching the rects.
-    } else {
-        activeScrollers.push({
-            scrollerIndex: scrollers.indexOf(scroller),
-            scrollerEl: scroller.el,
-            horizontal,
-            vertical,
-            speedInput,
-        });
     }
 }
 
@@ -486,9 +414,9 @@ function activateScroller(scroller: ScrollerRecord, horizontal: number, vertical
 // in the direction of mouseY, and only when the move is outside of
 // precomputed zone where we know no move happened. When insertionContainer
 // is supplied, we ignore both optimizations.
-function findUpdatedNewIndex(evtPoint: EvPlace, insertionContainer?: HTMLElement): number {
+function findUpdatedEventualIndex(containerEl: HTMLElement, evtPoint: EvPlace): number {
+    if ()
     let ignoreCurrentNewIndex = Boolean(insertionContainer);
-    let containerEl = insertionContainer || toEl as HTMLElement;
     // TODO: There is some glitch in how mouseY works after autoscroll.
     // I don't know what the issue is, but there is some shift introduced,
     // perhaps at this place.
@@ -621,67 +549,6 @@ function findPlaceholderTop(): number {
     }
     // This will be the new activeEl's top as well, once we move it.
     return ref ? ref.offsetTop + offsetCorrection : offsetCorrection;
-}
-
-function animateMoveInsideContainer(containerEl: HTMLElement, previousIndex: number, newNewIndex: number) {
-    // There are 4 groups of elements, adjusted by different offsets:
-    //
-    // 1. no offset
-    // All elements before oldIndex (in fromEl) or newIndex
-    // (in containerEl).
-    // When fromEl === containerEl, both conditions are required.
-    //
-    // 2. activeToPlaceholderOffset
-    // Elements in fromEl with index after max(newIndex, oldIndex).
-    //
-    // 3. activeToNothingOffset
-    // Elements in fromEl that are after oldIndex, except those
-    // after newIndex when fromEl === containerEl.
-    //
-    // 4. nothingToPlaceholderOffset
-    // All elements after newIndex except those in fromEl that are also
-    // after oldIndex.
-    //
-    // I though that I'd do something smart to change the elements
-    // that are affected in groups, but no I'm thinking I'll go over
-    // all potentially effected elements and run the above logic for
-    // each of them.
-
-    // shadow newIndex to avoid using it accidentally
-    let newIndex = 'DEATH AND DESTRUCTION!';
-
-    let maxItemIndex = getItemsInContainerEnd(containerEl) - 1;
-    let affectedStart =
-        Math.min(maxItemIndex, Math.min(newNewIndex, previousIndex));
-    let affectedEnd =
-        Math.min(maxItemIndex, Math.max(newNewIndex, previousIndex));
-
-    if (maxItemIndex === -1) {
-    return; // Empty container, nothing to animate.
-    }
-
-    // Note: we are using actual oldIndex below, not previousIndex.
-    // This is because we have to deal with activeEl affecting offsets,
-    // even though it's not visible.
-    // Previous index doesn't matter any more here, it was only
-    // for determining the affected range.
-    for (let i = affectedStart; i <= affectedEnd; ++i) {
-        let otherEl = containerEl.children[i] as HTMLElement;
-        if (otherEl === activeEl && dragKind === DragKind.Move) continue;
-
-        let afterOld = containerEl === fromEl && dragKind === DragKind.Move && i >= oldIndex;
-        let afterNew = afterOld ? i > newNewIndex : i >= newNewIndex;
-
-        if (afterNew && afterOld) {
-            Anim.start(containerEl, [otherEl], activeToPlaceholderOffset, animMs);
-        } else if (afterNew) {
-            Anim.start(containerEl, [otherEl], nothingToPlaceholderOffset, animMs);
-        } else if (afterOld) {
-            Anim.start(containerEl, [otherEl], activeToNothingOffset, animMs);
-        } else {
-            Anim.start(containerEl, [otherEl], 0, animMs);
-        }
-    }
 }
 
 function stateDrag_window_TouchCancel(event: TouchEvent) {
@@ -936,7 +803,7 @@ function maybeEnterContainer(containerData: ContainerData, evPlace: EvPlace) {
     }
     if (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
             xLast <= rect.right - rect.width * cData.options.enterGuardRight - cData.options.enterGuardRightPx) {
-        let insertionIndex = findUpdatedNewIndex(evPlace, cData.el);
+        let insertionIndex = findUpdatedEventualIndex(evPlace, cData.el);
         if (!isForbiddenIndex(cData.el, insertionIndex)) {
             enterContainer(cData.el, insertionIndex);
             return true;
