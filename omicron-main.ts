@@ -273,6 +273,12 @@ function startDrag() {
         navigator.vibrate(containerData.options.dragStartVibration);
     }
 
+    setDragState({
+        ...dragState,
+        state: StateEnum.PendingDrag,
+        floatEl,
+    });
+
     // Synthethic update, to determine the insertion point.
     // TODO: We might need to give it a hint that this is a drag start, after all.
     updateOnMove({
@@ -365,17 +371,18 @@ function handleMove(evtPoint: EvPlace) {
 
     updateFloatElOnNextFrame();
 
-    updateOnMove(dragState, evtPoint);
+    updateOnMove(evtPoint);
 }
 
 // This is to be called both when pointer moves, and to invoke synthetic update
 // after scroll.
-function updateOnMove(dragState: PendingDragState, evtPoint: EvPlace) {
+function updateOnMove(evtPoint: EvPlace) {
+    if (dragState?.state !== StateEnum.PendingDrag) return;
     // If we are hovering over some containers that are descendants
     // of toEl but we didn't enter them yet for any reason, let's reconsider.
     const toElDomDepth = dragState.to ? dragState.to.containerEl[expando].domDepth : -1;
     for (const hoverContainer of getHoverContainersDeeperThan(toElDomDepth)) {
-        if (maybeEnterContainer(hoverContainersByDepth[i], evtPoint)) {
+        if (maybeEnterContainer(hoverContainer, evtPoint)) {
             // enterContainer took take care of handling the new position
             // and animation, so our work here is done.
             return;
