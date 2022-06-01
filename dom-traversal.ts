@@ -1,7 +1,7 @@
 
 import { expando } from "./expando";
 import { ContainerOptions } from "./options";
-import { dragState } from "./state";
+import { dragState, StateEnum } from "./state";
 
 // Get elem's depth in the DOM tree.
 // Note: no special handling for elements not attached to actual document.
@@ -32,7 +32,7 @@ export function getItemsInContainerStartIndex(containerEl: HTMLElement) {
 // as well as anything with display: none.
 export function getItemsInContainerEndIndex(containerEl: HTMLElement) {
     const floatEl = dragState?.floatEl;
-    const placeholderEl = dragState?.to?.placeholderEl;
+    const placeholderEl = dragState?.state === StateEnum.PendingDrag ? dragState.to?.placeholderEl : undefined;
     for (let i = containerEl.children.length - 1; i >= 0; --i) {
         const candidate = containerEl.children[i];
         if (candidate !== floatEl &&
@@ -61,7 +61,7 @@ export function getItemFromContainerEvent(event: Event, options: ContainerOption
     // Returns null if the event is directly on the container,
     // or the element was filtered out for any reason.
     if (result &&
-            result !== dragState?.to?.placeholderEl &&
+            (dragState?.state !== StateEnum.PendingDrag || result !== dragState.to?.placeholderEl) &&
             (!options.draggableSelector || result.matches(options.draggableSelector)) &&
             (handleFound || !options.handleSelector))
         return result;
