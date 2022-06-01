@@ -1,7 +1,7 @@
 import { ContainerOptions } from './options';
 
 export interface ContainerData {
-    el: HTMLElement,
+    el: ContainerEl,
     options: ContainerOptions,
     domDepth: number,
 }

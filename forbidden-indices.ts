@@ -2,8 +2,8 @@ import { expando, ContainerEl } from './expando';
 
 export default class ForbiddenIndices {
 
-  public isForbiddenIndex(containerEl: ContainerEl, pickedEl: HTMLElement, index: number) {
-      return this.getForbiddenInsertionIndices(containerEl, pickedEl).has(index);
+  public isForbiddenIndex(containerEl: ContainerEl, pickedEl: HTMLElement, insertionIndex: number) {
+      return this.getForbiddenInsertionIndices(containerEl, pickedEl).has(insertionIndex);
   }
 
   private getForbiddenInsertionIndices(containerEl: ContainerEl, pickedEl: HTMLElement) {

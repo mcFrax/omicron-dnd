@@ -5,15 +5,15 @@ import { EvPlace } from "./base-types";
 import { preventImmediateClick } from "./click-blocker";
 import { getItemFromContainerEvent, getItemsInContainerEndIndex, getItemsInContainerStartIndex, hasContainerAncestor } from "./dom-traversal";
 import { cancelIfCancellable, cancelIfOmicronActive, toggleListeners, TypedActiveEvent } from "./event-utils";
-import { ContainerEl, expando } from "./expando";
+import { ContainerData, ContainerEl, expando } from "./expando";
 import { DragEndEvent, DragKind } from "./external-types";
 import ForbiddenIndices from "./forbidden-indices";
-import { getHoverContainersDeeperThan } from "./hover-tracker";
+import { containerHoverEntered, containerHoverLeft, getHoverContainersDeeperThan } from "./hover-tracker";
 import { insertionIndexFromEventualIndex } from "./index-conversions";
 import { cancelInvisible, makeInvisible } from "./invisible-item";
 import { ContainerOptions } from "./options";
 import { disableOverscrollBehavior, revertOverscrollBehavior } from "./overscroll-behavior";
-import { updateActiveScrollers } from "./scrollers";
+import { updateActiveScrollers, updateScrollers } from "./scrollers";
 import { disableUserSelectOnBody, revertUserSelectOnBody } from "./selection-control";
 import { BadStateError, dragState, PendingDragState, PreDragState, setDragState, StateEnum } from "./state";
 import { updateFloatElOnNextFrame } from "./update-float-el-on-next-frame";
@@ -415,11 +415,12 @@ function updateOnMove(evtPoint: EvPlace) {
     updateActiveScrollers();
 
     let updatedEventualIndex = findUpdatedEventualIndex(to.containerEl, evtPoint);
+    let updatedInsertionIndex = insertionIndexFromEventualIndex(to.containerEl, updatedEventualIndex);
 
-    if (updatedEventualIndex != to.insertionIndex && !dragState.forbiddenIndices.isForbiddenIndex(to.containerEl, dragState.pickedEl, updatedEventualIndex)) {
+    if (updatedEventualIndex != to.insertionIndex && !dragState.forbiddenIndices.isForbiddenIndex(to.containerEl, dragState.pickedEl, updatedInsertionIndex)) {
         let previousEventualIndex = to.eventualIndex;
         to.eventualIndex = updatedEventualIndex;
-        to.insertionIndex = insertionIndexFromEventualIndex(to.containerEl, updatedEventualIndex);
+        to.insertionIndex = updatedInsertionIndex;
         animateMoveInsideContainer(to.containerEl, previousEventualIndex, updatedEventualIndex);
 
         setPlaceholderAndNoMoveZone();
@@ -808,17 +809,13 @@ function exitDrag(execSort: boolean) {
 function anyState_container_PointerEnter(event: TypedActiveEvent<PointerEvent, ContainerEl>) {
     const containerEl = event.currentTarget;
     const containerData = containerEl[expando];
-    containerData.domDepth = getDomDepth(containerEl);
-    if (hoverContainersByDepth.indexOf(containerData) === -1) {
-        hoverContainersByDepth.push(containerData);
-        hoverContainersByDepth.sort(cmpDomDepth);
-    }
+    containerHoverEntered(containerData);
 
-    if (!fromEl) {
+    if (dragState?.state !== StateEnum.PendingDrag) {
         // Not dragging anything, so nothing to do.
         return;
     }
-    if (containerEl === toEl) {
+    if (containerEl === dragState.to?.containerEl) {
         // Already in this container, nothing to do.
         return;
     }
@@ -829,12 +826,10 @@ function anyState_container_PointerEnter(event: TypedActiveEvent<PointerEvent, C
 function anyState_container_PointerLeave(event: TypedActiveEvent<PointerEvent, ContainerEl>) {
     const containerEl = event.currentTarget;
     const containerData = containerEl[expando];
-    let delIdx;
-    if ((delIdx = hoverContainersByDepth.indexOf(containerData)) !== -1) {
-        hoverContainersByDepth.splice(delIdx, 1);
-    }
+    containerHoverLeft(containerData);
 
-    if (containerEl !== toEl) {
+    if (dragState?.state !== StateEnum.PendingDrag ||
+            containerEl !== dragState.to?.containerEl) {
         return; // Not relevant.
     }
 
@@ -849,7 +844,8 @@ function anyState_container_PointerLeave(event: TypedActiveEvent<PointerEvent, C
         // to another container. In issue #8 we were hitting toEl === null here,
         // apparently because several timeouts from several left containers
         // got clamped together.
-        if (activeEl && toEl === containerEl) {
+        if (dragState?.state === StateEnum.PendingDrag &&
+                containerEl === dragState.to?.containerEl) {
             leaveContainer();
             // mousemove handler will figure the container to enter.
             // TODO: if it gets glitchy, call the mousemove handler here directly.
@@ -858,32 +854,35 @@ function anyState_container_PointerLeave(event: TypedActiveEvent<PointerEvent, C
 }
 
 function maybeEnterContainer(containerData: ContainerData, evPlace: EvPlace) {
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     let cData = containerData;
     let rect = cData.el.getClientRects()[0];
     if (!cData.options.allowDrop || !rect) {
         return false;
     }
+    const xLast = dragState.currentPointerPos.x;
     if (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
             xLast <= rect.right - rect.width * cData.options.enterGuardRight - cData.options.enterGuardRightPx) {
-        let insertionIndex = findUpdatedEventualIndex(evPlace, cData.el);
-        if (!isForbiddenIndex(cData.el, insertionIndex)) {
-            enterContainer(cData.el, insertionIndex);
+        const eventualIndex = findUpdatedEventualIndex(cData.el, evPlace);
+        const insertionIndex = insertionIndexFromEventualIndex(cData.el, eventualIndex);
+        if (!dragState.forbiddenIndices.isForbiddenIndex(cData.el, dragState.pickedEl, insertionIndex)) {
+            enterContainer(cData.el, insertionIndex, eventualIndex);
             return true;
         }
     }
     return false;
 }
 
-function enterContainer(newToEl: HTMLElement, insertionIndex: number) {
-    if (toEl !== null) {
+function enterContainer(toEl: ContainerEl, insertionIndex: number, eventualIndex: number) {
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
+    if (dragState.to) {
         // Handle removal from the previous container.
         leaveContainer();
     }
 
     // Then handle insertion into the new container.
-    toEl = newToEl;
 
-    scrollers = collectScrollers(toEl);
+    updateScrollers(toEl);
 
     createPlaceholder();
 
