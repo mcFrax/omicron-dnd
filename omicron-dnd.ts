@@ -7,7 +7,7 @@ import { getItemFromContainerEvent, getItemsInContainerEndIndex, getItemsInConta
 import { cancelIfCancellable, cancelIfOmicronActive, toggleListeners, TypedActiveEvent } from "./event-utils";
 import { ContainerData, ContainerEl, expando } from "./expando";
 import { DragEndEvent, DragKind } from "./external-types";
-import ForbiddenIndices from "./forbidden-indices";
+import { ForbiddenIndices } from "./forbidden-indices";
 import { containerHoverEntered, containerHoverLeft, getHoverContainersDeeperThan } from "./hover-tracker";
 import { insertionIndexFromEventualIndex } from "./index-conversions";
 import { cancelInvisible, makeInvisible } from "./invisible-item";

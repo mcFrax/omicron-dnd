@@ -1,6 +1,6 @@
 import { expando, ContainerEl } from './expando';
 
-export default class ForbiddenIndices {
+export class ForbiddenIndices {
 
   public isForbiddenIndex(containerEl: ContainerEl, pickedEl: HTMLElement, insertionIndex: number) {
       return this.getForbiddenInsertionIndices(containerEl, pickedEl).has(insertionIndex);

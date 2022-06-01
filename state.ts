@@ -8,7 +8,7 @@ import {
   InsertionPlaceCandidate,
   InsertionPlace,
 } from './base-types';
-import ForbiddenIndices from './forbidden-indices';
+import { ForbiddenIndices } from './forbidden-indices';
 
 export enum StateEnum {
   PreDrag,
