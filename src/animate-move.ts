@@ -32,9 +32,8 @@ export function animateMoveInsideContainer(containerEl: HTMLElement, previousEve
     if (dragState?.state !== StateEnum.PendingDrag) return;
 
     const {
-        activeToPlaceholderOffset,
-        activeToNothingOffset,
-        nothingToPlaceholderOffset,
+        pickedToPlaceholderOffset,
+        gapToPlaceholderOffset,
     } = getOffsets();
 
     let maxItemIndex = getItemsInContainerEndIndex(containerEl) - 1;
@@ -63,11 +62,11 @@ export function animateMoveInsideContainer(containerEl: HTMLElement, previousEve
         let afterNew = afterOld ? i > newEventualIndex : i >= newEventualIndex;
 
         if (afterNew && afterOld) {
-            Anim.start(containerEl, [otherEl], activeToPlaceholderOffset, animMs);
+            Anim.start(containerEl, [otherEl], pickedToPlaceholderOffset, animMs);
         } else if (afterNew) {
-            Anim.start(containerEl, [otherEl], nothingToPlaceholderOffset, animMs);
+            Anim.start(containerEl, [otherEl], gapToPlaceholderOffset, animMs);
         } else if (afterOld) {
-            Anim.start(containerEl, [otherEl], activeToNothingOffset, animMs);
+            Anim.start(containerEl, [otherEl], dragState.pickedElToGapOffset, animMs);
         } else {
             Anim.start(containerEl, [otherEl], 0, animMs);
         }

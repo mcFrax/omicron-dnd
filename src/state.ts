@@ -48,6 +48,10 @@ type BaseDragState = {
   from: ItemOriginalPlace
   // DOMRect of pickedEl at the time of pointerdown event.
   initialPickupRect: DOMRect
+  // Precomputed offsets. As the element is hidden, it's computed style may
+  // change, even though it doesn't affect the 
+  pickedElToGapOffset: number
+  pickedElToNothingOffset: number
   // Pointer position from original pointerdown event.
   pickupPointerPos: Vec2D
   // Most recent pointer position.

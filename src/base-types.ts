@@ -35,6 +35,9 @@ export type InsertionPlaceCandidate = InsertionPlace & {
   // height of the placeholder is CSS-defined, this height it used, otherwise,
   // a activeEl's height-derived default is used.
   placeholderEl: HTMLElement
+  // The offset by which the items below placeholder should be moved visually
+  // to accomodate the placeholder.
+  gapToPlaceholderOffset: number
   // Cached y-range such that until pointer leaves it, the target index won't
   // change.
   yStartNoMoveZone: number

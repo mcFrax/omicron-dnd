@@ -78,3 +78,27 @@ export function hasContainerAncestor(element: HTMLElement) {
     }
     return false;
 }
+
+export function findPreviousStaticSibling(element: Element): Element | undefined {
+    for (let sibling = element.previousElementSibling;
+            sibling;
+            sibling = sibling.previousElementSibling) {
+        const style = getComputedStyle(sibling);
+        if ((style.position === 'static' || style.position === 'relative') && style.display !== 'hidden') {
+            return sibling;
+        }
+    }
+    return undefined;
+}
+
+export function findNextStaticSibling(element: Element): Element | undefined {
+    for (let sibling = element.nextElementSibling;
+            sibling;
+            sibling = sibling.nextElementSibling) {
+        const style = getComputedStyle(sibling);
+        if ((style.position === 'static' || style.position === 'relative') && style.display !== 'hidden') {
+            return sibling;
+        }
+    }
+    return undefined;
+}
