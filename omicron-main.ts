@@ -926,6 +926,7 @@ function leaveContainer() {
 }
 
 function createPlaceholder(toEl: ContainerEl) {
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     const placeholderEl = document.createElement('div');
     placeholderEl.style.position = 'absolute';
     placeholderEl.style.top = '0';
@@ -940,18 +941,15 @@ function createPlaceholder(toEl: ContainerEl) {
     // Set the height only if not set externally.
     let autoHeight = getComputedStyle(placeholderEl).height;
     if (!autoHeight || autoHeight === '0px') {
-        placeholderEl.style.height = Math.min(activeEl.offsetHeight - 16, 200) + 'px';
+        placeholderEl.style.height = Math.min(dragState.pickedEl.offsetHeight - 16, 200) + 'px';
     }
     // TODO: Figure out how to determine these properly. I guess we need to take
     // the container's clientWidth and make the actual math with margins and
     // stuff.
     // For now let's assume that the offsets on activeEl are ok and that
     // they are the same on both sides.
-    placeholderEl.style.left = activeEl.offsetLeft + 'px';
-    placeholderEl.style.right = activeEl.offsetLeft + 'px';
-    // nothingToPlaceholderOffset may be different in different containers,
-    // as different containers may have differe placeholder height.
-    nothingToPlaceholderOffset = placeholderEl.offsetHeight + 8;
+    placeholderEl.style.left = dragState.pickedEl.offsetLeft + 'px';
+    placeholderEl.style.right = dragState.pickedEl.offsetLeft + 'px';
     return placeholderEl;
 }
 
