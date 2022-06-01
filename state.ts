@@ -72,7 +72,7 @@ export type PreDragState = BaseDragState & {
   state: StateEnum.PreDrag
   // Pre-drag timeout measures the delay in the preDrag phase.
   // This is the id value returned by setTimeout.
-  preDragTimeoutId: number
+  preDragTimeoutId: ReturnType<typeof setTimeout>
   // Stubs of some common fields so that they are defined on DragState.
   floatEl?: undefined
   to?: undefined
