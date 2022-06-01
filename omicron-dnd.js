@@ -161,7 +161,7 @@ const hoverContainersByDepth = [];
 // forbiddenInsertionIndicesFn is called only once per container for each drag.
 // Reset after each drag.
 let forbiddenInsertionIndicesCache = new Map();
-// Default options for an Omicron container.
+// Options for an Omicron container.
 // Actual options for a container are stored in
 // containerEl[expando].options.
 class ContainerOptions {
