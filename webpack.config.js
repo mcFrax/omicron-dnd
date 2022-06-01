@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = {
-  entry: './omicron-main.ts',
+  entry: './src/omicron-main.ts',
   devtool: 'source-map',
   module: {
     rules: [
@@ -18,7 +18,7 @@ module.exports = {
   output: {
     filename: 'omicron-dnd.js',
     library: 'OmicronDnd',
-    path: path.resolve(__dirname),
+    path: path.resolve(__dirname, 'dist'),
   },
   devServer: {
     inline: false,

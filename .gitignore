@@ -1,5 +1,1 @@
 node_modules
-*.js
-*.d.ts
-!omicron-dnd.js
-!omicron-dnd.d.ts
