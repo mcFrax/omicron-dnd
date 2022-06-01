@@ -23,7 +23,7 @@ type BaseDragState = {
   pointerId: number
   // Target of original pointerdown event, necessary for delayed call
   // to releasePointerCapture on dragStart.
-  pointerDownTarget: HTMLElement
+  pointerDownTarget: Element
   // Whether the current drag is triggered by touch.
   // Set in pointerdown and not reset after the drag.
   touchDrag: boolean

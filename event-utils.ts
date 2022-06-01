@@ -18,20 +18,33 @@ export function cancelIfCancellable(event: Event) {
 
 const eventListenerOptionsArg = {passive: false, capture: false};
 
+export type TypedActiveEvent<E extends Event = Event, T extends EventTarget = EventTarget> =
+        E & {
+            readonly currentTarget: T,
+            readonly target: T extends Element ? Element : EventTarget,
+        };
+export type TypedEventListener<E extends Event = Event, T extends EventTarget = EventTarget> =
+        (event: TypedActiveEvent<E, T>) => void
+export type TypedEventListenerObject<E extends Event = Event, T extends EventTarget = EventTarget> = {
+    handleEvent: TypedEventListener<E, T>,
+};
+type TypedEventListenerOrEventListenerObject<E extends Event = Event, T extends EventTarget = EventTarget> =
+        TypedEventListener<E, T> | TypedEventListenerObject<E, T>;
+
 // A subset of correct pairings. This is necessary to allow handlers taking the
 // specific subtype of Event.
-type ListenerPair =
-    ['touchstart'|'touchmove'|'touchend'|'touchcancel', (e: TouchEvent) => void] |
-    ['mousedown'|'mousemove'|'mouseup'|'mouseenter'|'mouseleave', (e: MouseEvent) => void] |
-    ['pointerdown'|'pointermove'|'pointerup'|'pointercancel'|'pointerenter'|'pointerleave', (e: PointerEvent) => void] |
-    ['dragover', (e: DragEvent) => void] |
-    ['selectstart', EventListenerOrEventListenerObject] |
-    [string, EventListenerOrEventListenerObject];
+type ListenerPair<T extends EventTarget = EventTarget> =
+    ['touchstart'|'touchmove'|'touchend'|'touchcancel', (e: TypedActiveEvent<TouchEvent, T>) => void] |
+    ['mousedown'|'mousemove'|'mouseup'|'mouseenter'|'mouseleave', (e: TypedActiveEvent<MouseEvent, T>) => void] |
+    ['pointerdown'|'pointermove'|'pointerup'|'pointercancel'|'pointerenter'|'pointerleave', (e: TypedActiveEvent<PointerEvent, T>) => void] |
+    ['dragover', (e: TypedActiveEvent<DragEvent, T>) => void] |
+    ['selectstart', TypedEventListenerOrEventListenerObject<Event, T>] |
+    [string, TypedEventListenerOrEventListenerObject<Event, T>];
 
-export function toggleListeners(
+export function toggleListeners<T extends EventTarget = EventTarget>(
         toggleOn: boolean,
-        element: HTMLElement|Document,
-        eventHandlerPairs: ListenerPair[]) {
+        element: T,
+        eventHandlerPairs: ListenerPair<T>[]) {
     const toggle =
         toggleOn ? HTMLElement.prototype.addEventListener : HTMLElement.prototype.removeEventListener;
     for (const [eventName, handler] of eventHandlerPairs) {

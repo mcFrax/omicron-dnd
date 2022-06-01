@@ -4,7 +4,7 @@ import { Anim, animMs, transformsByElem } from "./anims";
 import { EvPlace } from "./base-types";
 import { preventImmediateClick } from "./click-blocker";
 import { getItemFromContainerEvent, getItemsInContainerEndIndex, getItemsInContainerStartIndex, hasContainerAncestor } from "./dom-traversal";
-import { cancelIfCancellable, cancelIfOmicronActive, toggleListeners } from "./event-utils";
+import { cancelIfCancellable, cancelIfOmicronActive, toggleListeners, TypedActiveEvent } from "./event-utils";
 import { ContainerEl, expando } from "./expando";
 import { DragEndEvent, DragKind } from "./external-types";
 import ForbiddenIndices from "./forbidden-indices";
@@ -19,7 +19,7 @@ import { BadStateError, dragState, PendingDragState, PreDragState, setDragState,
 import { updateFloatElOnNextFrame } from "./update-float-el-on-next-frame";
 
 
-function initDragContainer(containerEl: HTMLElement, options: Partial<ContainerOptions>) {
+function initDragContainer(containerEl: ContainerEl, options: Partial<ContainerOptions>) {
     if (containerEl[expando]) {
         return;  // Ignore repeated calls.
     }
@@ -88,11 +88,11 @@ function toggleEvents_stateDrag(toggleOn: boolean, touchDrag: boolean) {
         ['selectstart', cancelIfCancellable],
     ]);
 }
-function anyState_container_PointerDown(event: PointerEvent) {
+function anyState_container_PointerDown(event: TypedActiveEvent<PointerEvent, ContainerEl>) {
     // Unconditionally release pointer capture. I do that before any checks
     // for pending drag to avoid unnecessary races with touchstart.
 
-    const containerEl = event.currentTarget as ContainerEl;
+    const containerEl = event.currentTarget;
     if (!hasContainerAncestor(containerEl)) {
         // Only let the event propagate if there are other containers below,
         // but don't let it go outside.
@@ -190,7 +190,7 @@ function anyState_container_PointerDown(event: PointerEvent) {
     // and leaveContainer during preDrag - these would mess up the drag
     // setup WRT toEl. The capture will be released afterwards, allowing
     // immediate execution of leaveContainer/enterContainer if necessary.
-    const pointerDownTarget = event.target as HTMLElement;
+    const pointerDownTarget = event.target;
     pointerDownTarget.setPointerCapture(event.pointerId);
 
     setDragState({
@@ -294,23 +294,23 @@ function startDrag() {
       clientY: dragState.currentPointerPos.y,
     });
 }
-function statePreDrag_window_TouchStart(event: TouchEvent) {
+function statePreDrag_window_TouchStart(event: TypedActiveEvent<TouchEvent, Document>) {
     if (dragState && event.touches.length !== 1) {
         // We don't allow multi-touch during drag.
         exitDrag(false);
     }
 }
-function statePreDrag_window_TouchMove(event: TouchEvent) {
+function statePreDrag_window_TouchMove(event: TypedActiveEvent<TouchEvent, Document>) {
     // We may not be able to cancel the scroll any more after this event,
     // so we have to give up the drag.
     exitDrag(false);
 }
-function statePreDrag_window_TouchEndOrCancel(event: TouchEvent) {
+function statePreDrag_window_TouchEndOrCancel(event: TypedActiveEvent<TouchEvent, Document>) {
     exitDrag(false);
     // This is pre-drag and no move happened, so we allow the click,
     // hence no preventDefault() call here.
 }
-function statePreDrag_window_PointerMove(event: PointerEvent) {
+function statePreDrag_window_PointerMove(event: TypedActiveEvent<PointerEvent, Document>) {
     if (dragState?.state !== StateEnum.PreDrag) throw new BadStateError(StateEnum.PreDrag);
     if (event.pointerId !== dragState.pointerId) {
         return;
@@ -327,18 +327,18 @@ function statePreDrag_window_PointerMove(event: PointerEvent) {
         startDrag();
     }
 }
-function statePreDrag_window_PointerUpOrCancel(event: PointerEvent) {
+function statePreDrag_window_PointerUpOrCancel(event: TypedActiveEvent<PointerEvent, Document>) {
     if (dragState?.state !== StateEnum.PreDrag) throw new BadStateError(StateEnum.PreDrag);
     if (event.pointerId !== dragState.pointerId) {
         return;
     }
     exitDrag(false);
 }
-function stateDrag_window_TouchStart(event: TouchEvent) {
+function stateDrag_window_TouchStart(event: TypedActiveEvent<TouchEvent, Document>) {
     // We don't allow multi-touch during dragging.
     exitDrag(false);
 }
-function stateDrag_window_TouchMove(event: TouchEvent) {
+function stateDrag_window_TouchMove(event: TypedActiveEvent<TouchEvent, Document>) {
     if (event.cancelable) {
         // Prevent scroll.
         event.preventDefault();
@@ -352,7 +352,7 @@ function stateDrag_window_TouchMove(event: TouchEvent) {
 
     handleMove(event.touches.item(0) as Touch);
 }
-function stateDrag_window_PointerMove(event: PointerEvent) {
+function stateDrag_window_PointerMove(event: TypedActiveEvent<PointerEvent, Document>) {
     if (event.pointerId !== dragState?.pointerId) {
         return;
     }
@@ -597,21 +597,21 @@ function findPlaceholderTop(): number {
     return ref ? ref.offsetTop + offsetCorrection : offsetCorrection;
 }
 
-function stateDrag_window_TouchCancel(event: TouchEvent) {
+function stateDrag_window_TouchCancel(event: TypedActiveEvent<TouchEvent, Document>) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     exitDrag(false);
 }
-function stateDrag_window_TouchEnd(event: TouchEvent) {
+function stateDrag_window_TouchEnd(event: TypedActiveEvent<TouchEvent, Document>) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     dragEndedWithRelease();
     event.preventDefault();
     event.stopPropagation();
 }
-function stateDrag_window_PointerCancel(event: PointerEvent) {
+function stateDrag_window_PointerCancel(event: TypedActiveEvent<PointerEvent, Document>) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     exitDrag(false);
 }
-function stateDrag_window_PointerUp(event: PointerEvent) {
+function stateDrag_window_PointerUp(event: TypedActiveEvent<PointerEvent, Document>) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     if (event.pointerId !== dragState.pointerId) {
         return;
@@ -799,9 +799,9 @@ function exitDrag(execSort: boolean) {
     }
 }
 
-function anyState_container_PointerEnter(event: PointerEvent) {
-    const containerEl = event.currentTarget as HTMLElement;
-    const containerData = (containerEl as any)[expando] as ContainerData;
+function anyState_container_PointerEnter(event: TypedActiveEvent<PointerEvent, ContainerEl>) {
+    const containerEl = event.currentTarget;
+    const containerData = containerEl[expando];
     containerData.domDepth = getDomDepth(containerEl);
     if (hoverContainersByDepth.indexOf(containerData) === -1) {
         hoverContainersByDepth.push(containerData);
@@ -820,9 +820,9 @@ function anyState_container_PointerEnter(event: PointerEvent) {
     maybeEnterContainer(containerData, event);
 }
 
-function anyState_container_PointerLeave(event: PointerEvent) {
-    const containerEl = event.currentTarget as HTMLElement;
-    const containerData = (containerEl as any)[expando] as ContainerData;
+function anyState_container_PointerLeave(event: TypedActiveEvent<PointerEvent, ContainerEl>) {
+    const containerEl = event.currentTarget;
+    const containerData = containerEl[expando];
     let delIdx;
     if ((delIdx = hoverContainersByDepth.indexOf(containerData)) !== -1) {
         hoverContainersByDepth.splice(delIdx, 1);
