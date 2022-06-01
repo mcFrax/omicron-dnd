@@ -27,7 +27,7 @@ declare global {
     }
 }
 
-function initDragContainer(container: HTMLElement, options: Partial<ContainerOptions>) {
+function initDragContainer(container: HTMLElement, options?: Partial<ContainerOptions>) {
     if (container[expando]) {
         return;  // Ignore repeated calls.
     }
@@ -47,7 +47,7 @@ function initDragContainer(container: HTMLElement, options: Partial<ContainerOpt
         ['pointerenter', anyState_container_PointerEnter],
         ['pointerleave', anyState_container_PointerLeave],
     ]);
-    if (options.setWebkitTapHighlightColorTransparent &&
+    if (containerEl[expando].options.setWebkitTapHighlightColorTransparent &&
             ('webkitTapHighlightColor' in containerEl.style)) {
         containerEl.style.webkitTapHighlightColor = 'transparent';
     }

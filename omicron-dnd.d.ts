@@ -8,7 +8,7 @@ declare global {
         webkitTapHighlightColor: string;
     }
 }
-declare function initDragContainer(container: HTMLElement, options: Partial<ContainerOptions>): void;
+declare function initDragContainer(container: HTMLElement, options?: Partial<ContainerOptions>): void;
 declare const _default: {
     init: typeof initDragContainer;
     DragKind: typeof DragKind;

@@ -35,7 +35,7 @@ function initDragContainer(container, options) {
         ['pointerenter', anyState_container_PointerEnter],
         ['pointerleave', anyState_container_PointerLeave],
     ]);
-    if (options.setWebkitTapHighlightColorTransparent &&
+    if (containerEl[expando].options.setWebkitTapHighlightColorTransparent &&
         ('webkitTapHighlightColor' in containerEl.style)) {
         containerEl.style.webkitTapHighlightColor = 'transparent';
     }
