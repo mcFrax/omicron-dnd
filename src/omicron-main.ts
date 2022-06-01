@@ -687,16 +687,12 @@ function exitDrag(execSort: boolean) {
             newIndex: dragState.to.eventualIndex,
         };
 
-        // Note:
-        // We need to adjust the position of elements with transform
-        // to avoid shifting them around suddenly. It would be nice
-        // to do that in one go for each element, but that would involve
-        // several cases and so on. I'll just do that as I go, and not
-        // worry that I do that twice for some elements most of the time.
-
         if (dragState.dragKind === DragKind.Move) {
             dragState.pickedEl.remove();
         }
+
+        // Remove placeholder.
+        dragState.to.placeholderEl.remove();
 
         const {
             containerEl: fromEl,
@@ -708,17 +704,24 @@ function exitDrag(execSort: boolean) {
         } = dragState.to;
 
         const pickedElToGapOffset = dragState.pickedElToGapOffset;
-        const immediateTranslation = (currentY: number) => currentY - pickedElToGapOffset;
-        // Adjust elements after removed and animate them to 0.
-        // We assume that they're offset position was changed by
-        // pickedElToGapOffset, so we immediately subtract that from
-        // their translation.
-        for (let elem of Array.from(fromEl.children).slice(fromIndex) as HTMLElement[]) {
-            Anim.start(fromEl, [elem], 0, animMs, immediateTranslation);
-        }
 
-        // Remove placeholder.
-        dragState.to.placeholderEl.remove();
+        // Note:
+        // We need to adjust the position of elements with transform
+        // to avoid shifting them around suddenly. It would be nice
+        // to do that in one go for each element, but that would involve
+        // several cases and so on. I'll just do that as I go, and not
+        // worry that I do that twice for some elements most of the time.
+
+        if (dragState.dragKind === DragKind.Move) {
+            const immediateTranslation = (currentY: number) => currentY - pickedElToGapOffset;
+            // Adjust elements after removed and animate them to 0.
+            // We assume that they're offset position was changed by
+            // pickedElToGapOffset, so we immediately subtract that from
+            // their translation.
+            for (let elem of Array.from(fromEl.children).slice(fromIndex) as HTMLElement[]) {
+                Anim.start(fromEl, [elem], 0, animMs, immediateTranslation);
+            }
+        }
 
         // We removed pickedEl before, so now we insert simply at eventualIndex.
         if (eventualIndex === toEl.children.length) {

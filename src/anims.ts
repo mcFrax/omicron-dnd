@@ -63,6 +63,11 @@ export class Anim {
 
             // Immediately make sure that the elements are where they are supposed to start.
             elem.style.transform = `translateY(${actualStartY}px)`;
+            if (actualStartY === 0) {
+                transformsByElem.delete(elem);
+            } else {
+                transformsByElem.set(elem, [0, actualStartY]);
+            }
 
             if (actualStartY !== targetYTranslation) {
                 Anim.add(elem, new Anim(parentEl, [elem], actualStartY, targetYTranslation, durationMs));
