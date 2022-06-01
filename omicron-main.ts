@@ -1,7 +1,7 @@
 
 import { animateMoveInsideContainer } from "./animate-move";
 import { Anim, animMs, transformsByElem } from "./anims";
-import { EvPlace } from "./base-types";
+import { EvPlace, InsertionPlace, InsertionPlaceCandidate } from "./base-types";
 import { preventImmediateClick } from "./click-blocker";
 import { getItemFromContainerEvent, getItemsInContainerEndIndex, getItemsInContainerStartIndex, hasContainerAncestor } from "./dom-traversal";
 import { cancelIfCancellable, cancelIfOmicronActive, toggleListeners, TypedActiveEvent } from "./event-utils";
@@ -423,7 +423,7 @@ function updateOnMove(evtPoint: EvPlace) {
         to.insertionIndex = updatedInsertionIndex;
         animateMoveInsideContainer(to.containerEl, previousEventualIndex, updatedEventualIndex);
 
-        setPlaceholderAndNoMoveZone();
+        updatePlaceholderAndNoMoveZone(to);
     }
 }
 
@@ -538,29 +538,25 @@ function findUpdatedEventualIndex(containerEl: HTMLElement, evtPoint: EvPlace): 
     return updatedNewIndex;
 }
 
-function setPlaceholderAndNoMoveZone(): void {
-    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
-    if (!dragState.to) return;
-    let newPlaceholderTop = findPlaceholderTop();
+function updatePlaceholderAndNoMoveZone(to: InsertionPlaceCandidate): void {
+    let newPlaceholderTop = findPlaceholderTop(to);
     // TODO: Extract, deduplicate, cache, correct margins.
-    const nothingToPlaceholderOffset = dragState.to.placeholderEl.offsetHeight;
-    dragState.to.yStartNoMoveZone = newPlaceholderTop - 8;
-    dragState.to.yEndNoMoveZone = newPlaceholderTop - nothingToPlaceholderOffset;
-    dragState.to.placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
+    const nothingToPlaceholderOffset = to.placeholderEl.offsetHeight;
+    to.yStartNoMoveZone = newPlaceholderTop - 8;
+    to.yEndNoMoveZone = newPlaceholderTop - nothingToPlaceholderOffset;
+    to.placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
 }
 
-function findPlaceholderTop(): number {
+function findPlaceholderTop({
+    containerEl: toEl,
+    eventualIndex,
+}: InsertionPlace): number {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
-    if (!dragState.to) return 0;
 
     const {
         containerEl: fromEl,
         index: oldIndex,
     } = dragState.from;
-    const {
-        containerEl: toEl,
-        eventualIndex,
-    } = dragState.to;
     const isMove = dragState.dragKind === DragKind.Move;
 
     // TODO: Extract, deduplicate, cache.
@@ -621,6 +617,7 @@ function stateDrag_window_PointerCancel(event: TypedActiveEvent<PointerEvent, Do
 function stateDrag_window_PointerUp(event: TypedActiveEvent<PointerEvent, Document>) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     if (event.pointerId !== dragState.pointerId) {
+        // Not relevant.
         return;
     }
     dragEndedWithRelease();
@@ -762,7 +759,7 @@ function exitDrag(execSort: boolean) {
         Anim.start(animElem, [animElem], 0, animMs, dragState.floatElPos.y - destRect.top);
 
         if (dragState.to) {
-            removeBottomPaddingCorrection();
+            removeBottomPaddingCorrection(dragState.to.containerEl);
 
             // Invoke onContainerLeft here to be consistent with how it's called
             // in leaveContainer - after the container cleanup.
@@ -884,107 +881,50 @@ function enterContainer(toEl: ContainerEl, insertionIndex: number, eventualIndex
 
     updateScrollers(toEl);
 
-    createPlaceholder();
+    dragState.to = {
+        containerEl: toEl,
+        insertionIndex,
+        eventualIndex,
+        placeholderEl: createPlaceholder(toEl),
+        yStartNoMoveZone: 0,  // Will be set below.
+        yEndNoMoveZone: 0,
+    }
 
     addBottomPaddingCorrection();
 
-    newIndex = insertionIndex;
-    animateMoveInsideContainer(toEl, getItemsInContainerEnd(toEl), newIndex);
+    updatePlaceholderAndNoMoveZone(dragState.to);
+    dragState.to.placeholderEl.style.visibility = 'visible';
 
-    setPlaceholderAndNoMoveZone();
-    activatePlaceholder();
+    animateMoveInsideContainer(toEl, getItemsInContainerEndIndex(toEl), eventualIndex);
 
-    const containerOptions = (toEl as any)[expando].options as ContainerOptions;
+    const containerOptions = toEl[expando].options;
     if (typeof containerOptions.onContainerEntered === 'function') {
-        containerOptions.onContainerEntered(fromEl as HTMLElement, activeEl as HTMLElement);
+        containerOptions.onContainerEntered(dragState.from.containerEl, dragState.pickedEl);
     }
 }
 
 function leaveContainer() {
-    deactivatePlaceholder();
+    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
+    if (!dragState.to) {
+        return;
+    }
 
-    animateMoveInsideContainer(toEl, newIndex, getItemsInContainerEnd(toEl));
+    const leftContainerEl = dragState.to.containerEl;
 
-    removeBottomPaddingCorrection();
+    animateMoveInsideContainer(leftContainerEl, dragState.to.eventualIndex, getItemsInContainerEndIndex(leftContainerEl));
 
-    const leftContainerEl = toEl;
+    removeBottomPaddingCorrection(leftContainerEl);
 
-    toEl = null;
+    dragState.to = undefined;
 
-    const containerOptions = (leftContainerEl as any)[expando].options as ContainerOptions;
+    const containerOptions = leftContainerEl[expando].options;
     if (typeof containerOptions.onContainerLeft === 'function') {
-        containerOptions.onContainerLeft(leftContainerEl, activeEl);
+        containerOptions.onContainerLeft(leftContainerEl, dragState.pickedEl);
     }
 }
 
-const minScrollSpeed = 0.3; // In pixels per millisecond.
-const maxScrollSpeed = 0.7; // In pixels per millisecond.
-const maxScrollSpeedIncrease = maxScrollSpeed - minScrollSpeed;
-
-function animationFrame(timestamp: DOMTimeStamp) {
-    animFrameRequestId = 0;  // Allow scheduling for the next frame.
-    if (floatEl) {
-        // TODO: adjust for scroll or other changes of the base.
-        floatEl.style.transform = `translate(${xDragClientPos}px,${yDragClientPos}px) scale(${floatElScale})`;
-    }
-    let needsNextFrame = false;
-    if (activeScrollers.length !== 0) {
-        needsNextFrame = true;
-        if (lastScrollAnimationTimestamp) {
-            let frameTime = timestamp - lastScrollAnimationTimestamp;
-            // Animate. If lastScrollAnimationTimestamp is not set, the animation
-            // will start on the next frame.
-            for (let s of activeScrollers) {
-                // Notice the difference between entries in activeScrollers and
-                // scrollers arrays, they are different.
-                const scrollSpeed = minScrollSpeed + s.speedInput * maxScrollSpeedIncrease;
-                if (s.vertical) {
-                    const oldValue = s.scrollerEl.scrollTop;
-                    const diff = s.vertical * scrollSpeed * frameTime;
-                    s.scrollerEl.scrollTop += diff;
-                    const actualDiff = s.scrollerEl.scrollTop - oldValue;
-                    if (actualDiff !== 0) {
-                        updateScrollerRects(s.scrollerIndex, actualDiff, 0);
-                    }
-                }
-                if (s.horizontal) {
-                    const oldValue = s.scrollerEl.scrollLeft;
-                    const diff = s.horizontal * scrollSpeed * frameTime;
-                    s.scrollerEl.scrollLeft += diff;
-                    const actualDiff = s.scrollerEl.scrollLeft - oldValue;
-                    if (actualDiff !== 0) {
-                        updateScrollerRects(s.scrollerIndex, 0, actualDiff);
-                    }
-                }
-            }
-        }
-        lastScrollAnimationTimestamp = timestamp;
-    }
-    // Iterate backwards to allow simple removal.
-    for (let i = anims.length - 1; i >= 0; --i) {
-        if (anims[i].animationFrame(timestamp)) {
-            needsNextFrame = true;
-        } else {
-            anims[i].remove();
-        }
-    }
-    if (needsNextFrame) {
-        animFrameRequestId = requestAnimationFrame(animationFrame);
-    }
-}
-
-function updateScrollerRects(updateBefore: number, vDiff: number, hDiff: number) {
-    for (let i = 0; i < updateBefore; ++i) {
-        const rect = scrollers[i].rect;
-        rect.top -= vDiff;
-        rect.bottom -= vDiff;
-        rect.left -= hDiff;
-        rect.right -= hDiff;
-    }
-}
-
-function createPlaceholder() {
-    placeholderEl = document.createElement('div');
+function createPlaceholder(toEl: ContainerEl) {
+    const placeholderEl = document.createElement('div');
     placeholderEl.style.position = 'absolute';
     placeholderEl.style.top = '0';
     placeholderEl.style.zIndex = '1';
@@ -1010,17 +950,7 @@ function createPlaceholder() {
     // nothingToPlaceholderOffset may be different in different containers,
     // as different containers may have differe placeholder height.
     nothingToPlaceholderOffset = placeholderEl.offsetHeight + 8;
-}
-
-function activatePlaceholder() {
-    placeholderEl.style.visibility = 'visible';
-}
-
-function deactivatePlaceholder() {
-    if (placeholderEl) {
-        placeholderEl.remove();
-    }
-    placeholderEl = null;
+    return placeholderEl;
 }
 
 function addBottomPaddingCorrection() {
@@ -1033,10 +963,10 @@ function addBottomPaddingCorrection() {
     }
 }
 
-function removeBottomPaddingCorrection() {
+function removeBottomPaddingCorrection(toEl: ContainerEl) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
-    if (dragState.to && dragState.to.containerEl !== dragState.from.containerEl) {
-        dragState.to.containerEl.style.paddingBottom = '';
+    if (toEl !== dragState.from.containerEl) {
+        toEl.style.paddingBottom = '';
     }
 }
 
