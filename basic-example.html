@@ -30,8 +30,10 @@
       <li>It's that simple! 😃👍</li>
     </ul>
   </body>
-  <script type="module">
-    import OmicronDnd from './omicron-dnd.js';
-    OmicronDnd.init(document.getElementById('list'));
+  <script src="./omicron-dnd.js"></script>
+  <script>
+    window.onload = () => {
+      OmicronDnd.init(document.getElementById('list'));
+    };
   </script>
 </html>

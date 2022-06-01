@@ -17,6 +17,7 @@ import { updateActiveScrollers, updateScrollers } from "./scrollers";
 import { disableUserSelectOnBody, revertUserSelectOnBody } from "./selection-control";
 import { BadStateError, dragState, PendingDragState, PreDragState, setDragState, StateEnum } from "./state";
 import { updateFloatElOnNextFrame } from "./update-float-el-on-next-frame";
+export * from "./external-types";
 
 declare global {
     interface Node {
@@ -27,7 +28,7 @@ declare global {
     }
 }
 
-function initDragContainer(container: HTMLElement, options?: Partial<ContainerOptions>) {
+export function init(container: HTMLElement, options?: Partial<ContainerOptions>) {
     if (container[expando]) {
         return;  // Ignore repeated calls.
     }
@@ -916,6 +917,8 @@ function leaveContainer() {
 
     const leftContainerEl = dragState.to.containerEl;
 
+    dragState.to.placeholderEl.remove();
+
     animateMoveInsideContainer(leftContainerEl, dragState.to.eventualIndex, getItemsInContainerEndIndex(leftContainerEl));
 
     removeBottomPaddingCorrection(leftContainerEl);
@@ -1007,8 +1010,3 @@ function createFloatEl(dragState: PreDragState): HTMLElement {
 
     return floatEl;
 }
-
-export default {
-    init: initDragContainer,
-    DragKind,
-};

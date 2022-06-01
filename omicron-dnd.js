@@ -1,3 +1,4 @@
+var OmicronDnd;
 /******/ (() => { // webpackBootstrap
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
@@ -1136,7 +1137,8 @@ var __webpack_exports__ = {};
   \*************************/
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */   "DragKind": () => (/* reexport safe */ _external_types__WEBPACK_IMPORTED_MODULE_6__.DragKind),
+/* harmony export */   "init": () => (/* binding */ init)
 /* harmony export */ });
 /* harmony import */ var _animate_move__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./animate-move */ "./animate-move.ts");
 /* harmony import */ var _anims__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./anims */ "./anims.ts");
@@ -1172,7 +1174,8 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-function initDragContainer(container, options) {
+
+function init(container, options) {
     if (container[_expando__WEBPACK_IMPORTED_MODULE_5__.expando]) {
         return; // Ignore repeated calls.
     }
@@ -1976,6 +1979,7 @@ function leaveContainer() {
         return;
     }
     const leftContainerEl = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.to.containerEl;
+    _state__WEBPACK_IMPORTED_MODULE_15__.dragState.to.placeholderEl.remove();
     (0,_animate_move__WEBPACK_IMPORTED_MODULE_0__.animateMoveInsideContainer)(leftContainerEl, _state__WEBPACK_IMPORTED_MODULE_15__.dragState.to.eventualIndex, (0,_dom_traversal__WEBPACK_IMPORTED_MODULE_3__.getItemsInContainerEndIndex)(leftContainerEl));
     removeBottomPaddingCorrection(leftContainerEl);
     _state__WEBPACK_IMPORTED_MODULE_15__.dragState.to = undefined;
@@ -2059,13 +2063,10 @@ function createFloatEl(dragState) {
     document.body.appendChild(floatEl);
     return floatEl;
 }
-/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ({
-    init: initDragContainer,
-    DragKind: _external_types__WEBPACK_IMPORTED_MODULE_6__.DragKind,
-});
 
 })();
 
+OmicronDnd = __webpack_exports__;
 /******/ })()
 ;
 //# sourceMappingURL=omicron-dnd.js.map

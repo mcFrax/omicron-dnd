@@ -226,7 +226,7 @@
         </div>
         <div id="log-content"></div>
     </div>
-    <script type="module">
+    <script>
         let urlParams = new URLSearchParams(document.location.search);
 
         const monkeyPatching = urlParams.get('enableTracking') === '1' || urlParams.get('enableTracking') === 'true';
@@ -321,7 +321,8 @@
             console.log('console.log and dispatchEvent monkey patched.');
         }
     </script>
-    <script type="module">
+    <script src="./omicron-dnd.js"></script>
+    <script>
     // Top-level async doesn't work in Safari <= 14, so we wrap everything
     // in an async function instead.
     (async () => {
@@ -379,8 +380,8 @@
                         '?cacheBusting=' + Math.round(Math.random() * 0xFFFFFFF).toString(36) :
                         '';
             try {
-                const omicronModule = await import('./omicron-dnd.js' + urlSuffix);
-                OmicronDnd = omicronModule.default;
+                // const omicronModule = await import('./omicron-dnd.js' + urlSuffix);
+                OmicronDnd = window.OmicronDnd;
             } catch (e) {
                 console.error('Failed to load Omicron.');
             }
