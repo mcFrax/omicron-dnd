@@ -1,6 +1,7 @@
 import { Anim, animMs } from "./anims";
 import { getItemsInContainerEndIndex } from "./dom-traversal";
 import { DragKind } from "./external-types";
+import { getOffsets } from "./offsets";
 import { dragState, StateEnum } from "./state";
 
 
@@ -30,12 +31,11 @@ export function animateMoveInsideContainer(containerEl: HTMLElement, previousEve
 
     if (dragState?.state !== StateEnum.PendingDrag) return;
 
-    // TODO: Extract, deduplicate, cache.
-    const activeElHeight = dragState.initialPickupRect.height;
-    const activeToPlaceholderOffset =
-        dragState.to ? dragState.to.placeholderEl.offsetHeight - activeElHeight : 0;
-    const activeToNothingOffset = -activeElHeight - 8;
-    const nothingToPlaceholderOffset = dragState.to?.placeholderEl.offsetHeight ?? 0;
+    const {
+        activeToPlaceholderOffset,
+        activeToNothingOffset,
+        nothingToPlaceholderOffset,
+    } = getOffsets();
 
     let maxItemIndex = getItemsInContainerEndIndex(containerEl) - 1;
     let affectedStart =

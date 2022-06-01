@@ -21,9 +21,7 @@ let animsByElem: Map<HTMLElement, Anim> = new Map();
 // Most recent x and y values (in pixel) set in translate(x, y) part
 // of the CSS transform set on an element animated with Anim. If the transform
 //  is unset or set to translate(0, 0), no entry is stored.
-// TODO: Invent some better interface to tap into this information than just
-// exporting it.
-export let transformsByElem: Map<HTMLElement, [number, number]>  = new Map();
+let transformsByElem: Map<HTMLElement, [number, number]>  = new Map();
 
 function animationFrame(timestamp: DOMHighResTimeStamp) {
     animFrameRequestId = 0;  // Allow scheduling for the next frame.
@@ -41,6 +39,10 @@ function animationFrame(timestamp: DOMHighResTimeStamp) {
     }
 }
 
+function identity<T>(v: T) {
+    return v;
+}
+
 // Anim is implemented to hold an array of elems, but we actually rely on it
 // holding only one (which means we can delete the whole old anim when adding
 // new one for the same element).
@@ -50,31 +52,25 @@ export class Anim {
             elems: HTMLElement[],
             targetYTranslation: number,
             durationMs: number,
-            startYTranslation: number|null=null) {
-        // How the actual, visible position differs from offsetTop.
-        if (startYTranslation === null) {
-            // TODO: Group the elements with the same initial translation.
-            // Round the initial translation to avoid sub-pixel differences.
-            // Alternatively work it around so that we _know_ all elements
-            // have the same starting transform - generating all these rects
-            // is a lot of useless computation and allocation.
-            for (let elem of elems) {
-                startYTranslation = (transformsByElem.get(elem) || [0, 0])[1];
-                if (startYTranslation !== targetYTranslation) {
-                    Anim.add(elem, new Anim(parentEl, [elem], startYTranslation, targetYTranslation, durationMs));
-                } else {
-                    let currentAnim = animsByElem.get(elem);
-                    if (currentAnim) {
-                        currentAnim.remove();
-                    }
-                }
-            }
-        } else {
+            startYTranslation: number|null|((previous: number) => number) = null) {
+        const initialTranslation =
+            (startYTranslation === null) ? identity :
+                (typeof startYTranslation === 'function') ?
+                    startYTranslation : (() => startYTranslation);
+
+        for (let elem of elems) {
+            const actualStartY = initialTranslation((transformsByElem.get(elem) || [0, 0])[1]);
+
             // Immediately make sure that the elements are where they are supposed to start.
-            let transformString = `translateY(${startYTranslation}px)`;
-            for (let elem of elems) {
-                elem.style.transform = transformString;
-                Anim.add(elem, new Anim(parentEl, [elem], startYTranslation, targetYTranslation, durationMs));
+            elem.style.transform = `translateY(${actualStartY}px)`;
+
+            if (actualStartY !== targetYTranslation) {
+                Anim.add(elem, new Anim(parentEl, [elem], actualStartY, targetYTranslation, durationMs));
+            } else {
+                let currentAnim = animsByElem.get(elem);
+                if (currentAnim) {
+                    currentAnim.remove();
+                }
             }
         }
         if (!animFrameRequestId) {
@@ -88,7 +84,7 @@ export class Anim {
         if (previousAnim) {
             anims[anims.indexOf(previousAnim)] = anim;
         } else {
-        anims.push(anim);
+            anims.push(anim);
         }
         animsByElem.set(elem, anim);
     }

@@ -1,6 +1,6 @@
 
 import { animateMoveInsideContainer } from "./animate-move";
-import { Anim, animMs, transformsByElem } from "./anims";
+import { Anim, animMs } from "./anims";
 import { EvPlace, InsertionPlace, InsertionPlaceCandidate } from "./base-types";
 import { preventImmediateClick } from "./click-blocker";
 import { getItemFromContainerEvent, getItemsInContainerEndIndex, getItemsInContainerStartIndex, hasContainerAncestor } from "./dom-traversal";
@@ -11,6 +11,7 @@ import { ForbiddenIndices } from "./forbidden-indices";
 import { containerHoverEntered, containerHoverLeft, getHoverContainersDeeperThan } from "./hover-tracker";
 import { insertionIndexFromEventualIndex } from "./index-conversions";
 import { cancelInvisible, makeInvisible } from "./invisible-item";
+import { getActiveToNothingOffset, getNothingToPlaceholderOffset, getOffsets } from "./offsets";
 import { ContainerOptions } from "./options";
 import { disableOverscrollBehavior, revertOverscrollBehavior } from "./overscroll-behavior";
 import { updateActiveScrollers, updateScrollers } from "./scrollers";
@@ -457,15 +458,14 @@ function findUpdatedEventualIndex(containerEl: HTMLElement, evtPoint: EvPlace): 
     } = dragState.from;
     const isMove = dragState.dragKind === DragKind.Move;
 
-    // TODO: Extract, deduplicate, cache.
-    const activeElHeight = dragState.initialPickupRect.height;
-    // Note: placeholderEl may be in a different container, so it's height may
-    // be completely broken here. It shouldn't matter, though, as we won't be
-    // using it in that case.
-    const activeToPlaceholderOffset =
-        dragState.to ? dragState.to.placeholderEl.offsetHeight - activeElHeight : 0;
-    const activeToNothingOffset = -activeElHeight - 8;
-    const nothingToPlaceholderOffset = dragState.to?.placeholderEl.offsetHeight ?? 0;
+    const {
+        // Note: placeholderEl may be in a different container, so it's height may
+        // be completely broken here. It shouldn't matter, though, as we won't be
+        // using it in that case.
+        activeToPlaceholderOffset,
+        activeToNothingOffset,
+        nothingToPlaceholderOffset,
+    } = getOffsets();
 
     let wiggleZoneSize = 0.5;
     let snapMargin = (1 - wiggleZoneSize) / 2;
@@ -546,10 +546,8 @@ function findUpdatedEventualIndex(containerEl: HTMLElement, evtPoint: EvPlace): 
 
 function updatePlaceholderAndNoMoveZone(to: InsertionPlaceCandidate): void {
     let newPlaceholderTop = findPlaceholderTop(to);
-    // TODO: Extract, deduplicate, cache, correct margins.
-    const nothingToPlaceholderOffset = to.placeholderEl.offsetHeight;
     to.yStartNoMoveZone = newPlaceholderTop - 8;
-    to.yEndNoMoveZone = newPlaceholderTop - nothingToPlaceholderOffset;
+    to.yEndNoMoveZone = newPlaceholderTop - getNothingToPlaceholderOffset();
     to.placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
 }
 
@@ -565,9 +563,7 @@ function findPlaceholderTop({
     } = dragState.from;
     const isMove = dragState.dragKind === DragKind.Move;
 
-    // TODO: Extract, deduplicate, cache.
-    const activeElHeight = dragState.initialPickupRect.height;
-    const activeToNothingOffset = -activeElHeight - 8;
+    const activeToNothingOffset = getActiveToNothingOffset();
 
     let startIndex = getItemsInContainerStartIndex(toEl);
     let endIndex = getItemsInContainerEndIndex(toEl);
@@ -705,19 +701,14 @@ function exitDrag(execSort: boolean) {
             eventualIndex,
         } = dragState.to;
 
-        // TODO: Extract, deduplicate, cache.
-        const activeElHeight = dragState.initialPickupRect.height;
-        const activeToNothingOffset = -activeElHeight - 8;
-        console.log('activeToNothingOffset', activeToNothingOffset);
+        const activeToNothingOffset = getActiveToNothingOffset();
 
         // Adjust elements after removed and animate them to 0.
+        // We assume that they're offset position was changed by
+        // activeToNothingOffset, so we immediately subtract that from
+        // their translation.
         for (let elem of Array.from(fromEl.children).slice(fromIndex) as HTMLElement[]) {
-            let currentTransform = (transformsByElem.get(elem) || [0, 0]);
-            currentTransform[1] -= activeToNothingOffset;
-            if (currentTransform[0] !== 0 || currentTransform[1] !== 0) {
-                transformsByElem.set(elem, currentTransform);
-            }
-            Anim.start(fromEl, [elem], 0, animMs, currentTransform[1]);
+            Anim.start(fromEl, [elem], 0, animMs, (currentY) => currentY - activeToNothingOffset);
         }
 
         // Remove placeholder.
@@ -732,12 +723,7 @@ function exitDrag(execSort: boolean) {
 
         // Adjust elements after inserted and animate them to 0.
         for (let elem of Array.from(toEl.children).slice(eventualIndex + 1) as HTMLElement[]) {
-            let currentTransform = (transformsByElem.get(elem) || [0, 0]);
-            currentTransform[1] += activeToNothingOffset;
-            if (currentTransform[0] !== 0 || currentTransform[1] !== 0) {
-                transformsByElem.set(elem, currentTransform);
-            }
-            Anim.start(fromEl, [elem], 0, animMs, currentTransform[1]);
+            Anim.start(fromEl, [elem], 0, animMs, (currentY) => currentY + activeToNothingOffset);
         }
     } else {
         dragEndEvent = {
@@ -964,9 +950,8 @@ function addBottomPaddingCorrection() {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     if (dragState.to && dragState.to.containerEl !== dragState.from.containerEl) {
         const toEl = dragState.to.containerEl;
-        const nothingToPlaceholderOffset = dragState.to.placeholderEl.offsetHeight;
         toEl.style.paddingBottom =
-            parseFloat(getComputedStyle(toEl).paddingBottom.slice(0, -2)) + nothingToPlaceholderOffset + 'px';
+            parseFloat(getComputedStyle(toEl).paddingBottom.slice(0, -2)) + getNothingToPlaceholderOffset() + 'px';
     }
 }
 
