@@ -29,12 +29,12 @@ export function animateMoveInsideContainer(containerEl: HTMLElement, previousEve
     // all potentially effected elements and run the above logic for
     // each of them.
 
-    if (dragState?.state !== StateEnum.PendingDrag) return;
+    if (!dragState) return;
 
     const {
         pickedToPlaceholderOffset,
         gapToPlaceholderOffset,
-    } = getOffsets();
+    } = getOffsets(dragState);
 
     let maxItemIndex = getItemsInContainerEndIndex(containerEl) - 1;
     let affectedStart =

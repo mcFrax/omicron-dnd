@@ -272,6 +272,7 @@ function startDrag() {
         // We will almost always override it with another animation of "insertion",
         // but sometimes it may happen that we actually leave the original container
         // immediately.
+        console.log('Animating');
         animateMoveInsideContainer(
             dragState.from.containerEl,
             dragState.from.index,
@@ -472,7 +473,7 @@ function findUpdatedEventualIndex(containerEl: HTMLElement, evtPoint: EvPlace): 
         pickedToGapOffset,
         pickedToPlaceholderOffset,
         gapToPlaceholderOffset,
-    } = getOffsets();
+    } = getOffsets(dragState);
 
     let wiggleZoneSize = 0.5;
     let snapMargin = (1 - wiggleZoneSize) / 2;

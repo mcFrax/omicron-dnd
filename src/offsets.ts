@@ -1,7 +1,7 @@
 import { InsertionPlaceCandidate } from "./base-types";
 import { findNextStaticSibling, findPreviousStaticSibling, getItemsInContainerEndIndex, getItemsInContainerStartIndex } from "./dom-traversal";
 import { DragKind } from "./external-types";
-import { BadStateError, dragState, StateEnum } from "./state";
+import { BadStateError, DragState, dragState, StateEnum } from "./state";
 
 
 type KnownLengthProperty =
@@ -94,10 +94,10 @@ export function getGapToPlaceholderOffset(to: InsertionPlaceCandidate): number {
   return getEffectiveClientHeight(to.placeholderEl) + effectiveTopGap + effectiveBottomGap - gap;
 }
 
-export function getOffsets() {
-    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
+export function getOffsets(dragState: DragState) {
     const pickedToGapOffset = dragState.pickedElToGapOffset;
-    const gapToPlaceholderOffset = dragState.to?.gapToPlaceholderOffset || 0;
+    const gapToPlaceholderOffset =
+            (dragState.state === StateEnum.PendingDrag && dragState.to?.gapToPlaceholderOffset) || 0;
     return {
         pickedToGapOffset,
         pickedToPlaceholderOffset: pickedToGapOffset + gapToPlaceholderOffset,
