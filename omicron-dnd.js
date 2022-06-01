@@ -48,7 +48,7 @@ function animateMoveInsideContainer(containerEl, previousEventualIndex, newEvent
     if ((_state__WEBPACK_IMPORTED_MODULE_3__.dragState === null || _state__WEBPACK_IMPORTED_MODULE_3__.dragState === void 0 ? void 0 : _state__WEBPACK_IMPORTED_MODULE_3__.dragState.state) !== _state__WEBPACK_IMPORTED_MODULE_3__.StateEnum.PendingDrag)
         return;
     // TODO: Extract, deduplicate, cache.
-    const activeElHeight = _state__WEBPACK_IMPORTED_MODULE_3__.dragState.pickedEl.offsetHeight;
+    const activeElHeight = _state__WEBPACK_IMPORTED_MODULE_3__.dragState.initialPickupRect.height;
     const activeToPlaceholderOffset = _state__WEBPACK_IMPORTED_MODULE_3__.dragState.to ? _state__WEBPACK_IMPORTED_MODULE_3__.dragState.to.placeholderEl.offsetHeight - activeElHeight : 0;
     const activeToNothingOffset = -activeElHeight - 8;
     const nothingToPlaceholderOffset = (_b = (_a = _state__WEBPACK_IMPORTED_MODULE_3__.dragState.to) === null || _a === void 0 ? void 0 : _a.placeholderEl.offsetHeight) !== null && _b !== void 0 ? _b : 0;
@@ -1557,7 +1557,7 @@ function findUpdatedEventualIndex(containerEl, evtPoint) {
     const { containerEl: fromEl, index: fromIndex, } = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.from;
     const isMove = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.dragKind === _external_types__WEBPACK_IMPORTED_MODULE_6__.DragKind.Move;
     // TODO: Extract, deduplicate, cache.
-    const activeElHeight = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.pickedEl.offsetHeight;
+    const activeElHeight = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.initialPickupRect.height;
     // Note: placeholderEl may be in a different container, so it's height may
     // be completely broken here. It shouldn't matter, though, as we won't be
     // using it in that case.
@@ -1659,7 +1659,7 @@ function findPlaceholderTop({ containerEl: toEl, eventualIndex, }) {
     const { containerEl: fromEl, index: oldIndex, } = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.from;
     const isMove = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.dragKind === _external_types__WEBPACK_IMPORTED_MODULE_6__.DragKind.Move;
     // TODO: Extract, deduplicate, cache.
-    const activeElHeight = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.pickedEl.offsetHeight;
+    const activeElHeight = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.initialPickupRect.height;
     const activeToNothingOffset = -activeElHeight - 8;
     let startIndex = (0,_dom_traversal__WEBPACK_IMPORTED_MODULE_3__.getItemsInContainerStartIndex)(toEl);
     let endIndex = (0,_dom_traversal__WEBPACK_IMPORTED_MODULE_3__.getItemsInContainerEndIndex)(toEl);
@@ -1792,8 +1792,9 @@ function exitDrag(execSort) {
         const { containerEl: fromEl, index: fromIndex, } = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.from;
         const { containerEl: toEl, eventualIndex, } = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.to;
         // TODO: Extract, deduplicate, cache.
-        const activeElHeight = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.pickedEl.offsetHeight;
+        const activeElHeight = _state__WEBPACK_IMPORTED_MODULE_15__.dragState.initialPickupRect.height;
         const activeToNothingOffset = -activeElHeight - 8;
+        console.log('activeToNothingOffset', activeToNothingOffset);
         // Adjust elements after removed and animate them to 0.
         for (let elem of Array.from(fromEl.children).slice(fromIndex)) {
             let currentTransform = (_anims__WEBPACK_IMPORTED_MODULE_1__.transformsByElem.get(elem) || [0, 0]);
@@ -2005,7 +2006,7 @@ function createPlaceholder(toEl) {
     // Set the height only if not set externally.
     let autoHeight = getComputedStyle(placeholderEl).height;
     if (!autoHeight || autoHeight === '0px') {
-        placeholderEl.style.height = Math.min(_state__WEBPACK_IMPORTED_MODULE_15__.dragState.pickedEl.offsetHeight - 16, 200) + 'px';
+        placeholderEl.style.height = Math.min(_state__WEBPACK_IMPORTED_MODULE_15__.dragState.initialPickupRect.height - 16, 200) + 'px';
     }
     // TODO: Figure out how to determine these properly. I guess we need to take
     // the container's clientWidth and make the actual math with margins and

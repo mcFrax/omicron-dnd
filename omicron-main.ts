@@ -458,7 +458,7 @@ function findUpdatedEventualIndex(containerEl: HTMLElement, evtPoint: EvPlace): 
     const isMove = dragState.dragKind === DragKind.Move;
 
     // TODO: Extract, deduplicate, cache.
-    const activeElHeight = dragState.pickedEl.offsetHeight;
+    const activeElHeight = dragState.initialPickupRect.height;
     // Note: placeholderEl may be in a different container, so it's height may
     // be completely broken here. It shouldn't matter, though, as we won't be
     // using it in that case.
@@ -566,7 +566,7 @@ function findPlaceholderTop({
     const isMove = dragState.dragKind === DragKind.Move;
 
     // TODO: Extract, deduplicate, cache.
-    const activeElHeight = dragState.pickedEl.offsetHeight;
+    const activeElHeight = dragState.initialPickupRect.height;
     const activeToNothingOffset = -activeElHeight - 8;
 
     let startIndex = getItemsInContainerStartIndex(toEl);
@@ -706,8 +706,9 @@ function exitDrag(execSort: boolean) {
         } = dragState.to;
 
         // TODO: Extract, deduplicate, cache.
-        const activeElHeight = dragState.pickedEl.offsetHeight;
+        const activeElHeight = dragState.initialPickupRect.height;
         const activeToNothingOffset = -activeElHeight - 8;
+        console.log('activeToNothingOffset', activeToNothingOffset);
 
         // Adjust elements after removed and animate them to 0.
         for (let elem of Array.from(fromEl.children).slice(fromIndex) as HTMLElement[]) {
@@ -947,7 +948,7 @@ function createPlaceholder(toEl: ContainerEl) {
     // Set the height only if not set externally.
     let autoHeight = getComputedStyle(placeholderEl).height;
     if (!autoHeight || autoHeight === '0px') {
-        placeholderEl.style.height = Math.min(dragState.pickedEl.offsetHeight - 16, 200) + 'px';
+        placeholderEl.style.height = Math.min(dragState.initialPickupRect.height - 16, 200) + 'px';
     }
     // TODO: Figure out how to determine these properly. I guess we need to take
     // the container's clientWidth and make the actual math with margins and
