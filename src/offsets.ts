@@ -13,6 +13,10 @@ export function getComputedStyleOr0(elem: Element | undefined | null, prop: Know
   return parseFloat(getComputedStyle(elem)[prop]);
 }
 
+export function getEffectiveClientHeight(elem: Element): number {
+  return elem.getClientRects()[0]?.height || 0;
+}
+
 export function getTopSiblingMargin(item: Element) {
   return getComputedStyleOr0(findPreviousStaticSibling(item), 'marginBottom');
 }
@@ -33,7 +37,7 @@ export function getEffectiveBottomSiblingMargin(item: Element) {
 
 export function getItemToNothingOffset(item: HTMLElement): number {
     return -(
-        getComputedStyleOr0(item, 'height') +
+        getEffectiveClientHeight(item) +
         getEffectiveTopSiblingMargin(item) +
         getEffectiveBottomSiblingMargin(item));
 }
@@ -87,7 +91,7 @@ export function getGapToPlaceholderOffset(to: InsertionPlaceCandidate): number {
   const effectiveBottomGap =
       !bottomSibling ? 0 : Math.max(getComputedStyleOr0(to.placeholderEl, 'marginTop'), bottomSiblingMargin);
 
-  return getComputedStyleOr0(to.placeholderEl, 'height') + effectiveTopGap + effectiveBottomGap - gap;
+  return getEffectiveClientHeight(to.placeholderEl) + effectiveTopGap + effectiveBottomGap - gap;
 }
 
 export function getOffsets() {

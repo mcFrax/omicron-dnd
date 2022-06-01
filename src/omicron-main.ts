@@ -11,7 +11,7 @@ import { ForbiddenIndices } from "./forbidden-indices";
 import { containerHoverEntered, containerHoverLeft, getHoverContainersDeeperThan } from "./hover-tracker";
 import { insertionIndexFromEventualIndex } from "./index-conversions";
 import { cancelInvisible, makeInvisible } from "./invisible-item";
-import { getComputedStyleOr0, getGapBetweenSiblingsAfterItemRemoval, getGapToPlaceholderOffset, getItemToNothingOffset, getOffsets } from "./offsets";
+import { getComputedStyleOr0, getEffectiveClientHeight, getGapBetweenSiblingsAfterItemRemoval, getGapToPlaceholderOffset, getItemToNothingOffset, getOffsets } from "./offsets";
 import { ContainerOptions } from "./options";
 import { disableOverscrollBehavior, revertOverscrollBehavior } from "./overscroll-behavior";
 import { updateActiveScrollers, updateScrollers } from "./scrollers";
@@ -555,7 +555,7 @@ function updatePlaceholderAndNoMoveZone(to: InsertionPlaceCandidate): void {
     let newPlaceholderTop = findPlaceholderTop(to);
     to.yStartNoMoveZone = newPlaceholderTop;
     to.gapToPlaceholderOffset = getGapToPlaceholderOffset(to);
-    to.yEndNoMoveZone = newPlaceholderTop - getComputedStyleOr0(to.placeholderEl, 'height');
+    to.yEndNoMoveZone = newPlaceholderTop - getEffectiveClientHeight(to.placeholderEl);
     to.placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
 }
 
