@@ -22,6 +22,9 @@ declare global {
     interface Node {
         cloneNode<T extends Node>(this: T, deep?: boolean | undefined): T;
     }
+    interface CSSStyleDeclaration {
+        webkitTapHighlightColor: string;
+    }
 }
 
 function initDragContainer(container: HTMLElement, options: Partial<ContainerOptions>) {
