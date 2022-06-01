@@ -18,6 +18,11 @@ import { disableUserSelectOnBody, revertUserSelectOnBody } from "./selection-con
 import { BadStateError, dragState, PendingDragState, PreDragState, setDragState, StateEnum } from "./state";
 import { updateFloatElOnNextFrame } from "./update-float-el-on-next-frame";
 
+declare global {
+    interface Node {
+        cloneNode<T extends Node>(this: T, deep?: boolean | undefined): T;
+    }
+}
 
 function initDragContainer(containerEl: ContainerEl, options: Partial<ContainerOptions>) {
     if (containerEl[expando]) {
@@ -344,13 +349,14 @@ function stateDrag_window_TouchMove(event: TypedActiveEvent<TouchEvent, Document
         event.preventDefault();
     }
 
-    if (event.touches.length !== 1) {
+    const touch = event.touches.item(0);
+    if (!touch || event.touches.length !== 1) {
         // We don't allow multi-touch during dragging.
         exitDrag(false);
         return;
     }
 
-    handleMove(event.touches.item(0) as Touch);
+    handleMove(touch);
 }
 function stateDrag_window_PointerMove(event: TypedActiveEvent<PointerEvent, Document>) {
     if (event.pointerId !== dragState?.pointerId) {
@@ -662,7 +668,7 @@ function exitDrag(execSort: boolean) {
             (dragState.to.containerEl !== dragState.from.containerEl ||
                 dragState.to.eventualIndex !== dragState.from.index)
     ) {
-        insertEl = (dragState.dragKind === DragKind.Move) ? dragState.pickedEl : dragState.pickedEl.cloneNode(true) as HTMLElement;
+        insertEl = (dragState.dragKind === DragKind.Move) ? dragState.pickedEl : dragState.pickedEl.cloneNode(true);
         dragEndEvent = {
             dragExecuted: true,
             item: dragState.pickedEl,  // TODO: handle move differently.
@@ -1037,7 +1043,7 @@ function removeBottomPaddingCorrection() {
 
 function createFloatEl(dragState: PreDragState): HTMLElement {
     const pickedEl = dragState.pickedEl;
-    const floatEl = pickedEl.cloneNode(true) as HTMLElement;
+    const floatEl = pickedEl.cloneNode(true);
 
     floatEl.style.position = 'fixed';
     floatEl.style.left = '0';
