@@ -24,15 +24,17 @@ declare global {
     }
 }
 
-function initDragContainer(containerEl: ContainerEl, options: Partial<ContainerOptions>) {
-    if (containerEl[expando]) {
+function initDragContainer(container: HTMLElement, options: Partial<ContainerOptions>) {
+    if (container[expando]) {
         return;  // Ignore repeated calls.
     }
-    const containerData = containerEl[expando] = {
-        el: containerEl,
-        options: Object.assign(new ContainerOptions(), options || {}),
-        domDepth: 0, // To be updated dynamically when added to hoverContainers.
-    };
+    const containerEl: ContainerEl = Object.assign(container, {
+        [expando]: {
+            el: container,
+            options: Object.assign(new ContainerOptions(), options || {}),
+            domDepth: 0, // To be updated dynamically when added to hoverContainers.
+        },
+    });
     toggleListeners(true, document, [
         ['dragover', cancelIfOmicronActive],
         ['touchmove', cancelIfOmicronActive],
@@ -42,7 +44,7 @@ function initDragContainer(containerEl: ContainerEl, options: Partial<ContainerO
         ['pointerenter', anyState_container_PointerEnter],
         ['pointerleave', anyState_container_PointerLeave],
     ]);
-    if (containerData.options.setWebkitTapHighlightColorTransparent &&
+    if (options.setWebkitTapHighlightColorTransparent &&
             ('webkitTapHighlightColor' in containerEl.style)) {
         containerEl.style.webkitTapHighlightColor = 'transparent';
     }
