@@ -443,7 +443,7 @@ function updateOnMove(evtPoint: EvPlace) {
     }
 }
 
-function findUpdatedInsertionIndex(containerEl: HTMLElement, evtPoint: EvPlace): number {
+function findUpdatedInsertionIndex(containerEl: ContainerEl, evtPoint: EvPlace): number {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
 
     // TODO: There is some glitch in how mouseY works after autoscroll.
@@ -472,16 +472,32 @@ function findUpdatedInsertionIndex(containerEl: HTMLElement, evtPoint: EvPlace):
         if (!(ref instanceof HTMLElement)) {
             continue;
         }
+        let eventualIndexCandidate = insertionIndexCandidate;
         if (containerEl === fromEl) {
             if (insertionIndexCandidate === fromIndex) {
                 continue;
             }
             if (insertionIndexCandidate > fromIndex && isMove) {
                 offsetCorrection = dragState.pickedElToGapOffset;
+                eventualIndexCandidate -= 1;
             }
         }
 
-        if (mouseY <= ref.offsetTop + ref.offsetHeight + offsetCorrection) {
+        const gapToPlaceholderOffset = getGapToPlaceholderOffset({
+            containerEl,
+            insertionIndex: insertionIndexCandidate,
+            eventualIndex: eventualIndexCandidate,
+            placeholderEl: getOrCreatePlaceholder(containerEl),
+            gapToPlaceholderOffset: 0, // placeholder value
+        });
+
+        const correctedRefTop = ref.offsetTop + offsetCorrection;
+        // TODO: Using gapToPlaceholderOffset directly here is imprecise.
+        const minimalCatchZoneEnd = correctedRefTop + Math.min(ref.offsetHeight, gapToPlaceholderOffset);
+        const maximalCatchZoneEnd = correctedRefTop + ref.offsetHeight;
+        const catchZoneEnd = (minimalCatchZoneEnd + maximalCatchZoneEnd) / 2;
+
+        if (mouseY <= catchZoneEnd) {
             return insertionIndexCandidate;
         }
     }
