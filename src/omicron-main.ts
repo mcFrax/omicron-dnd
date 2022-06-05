@@ -437,6 +437,7 @@ function updateOnMove(evtPoint: EvPlace) {
         to.insertionIndex = updatedInsertionIndex;
 
         updatePlaceholderAndNoMoveZone(to);
+        updateBottomPaddingCorrection();
 
         animateMoveInsideContainer(to.containerEl, previousEventualIndex, updatedEventualIndex);
     }
@@ -808,9 +809,8 @@ function enterContainer(toEl: ContainerEl, insertionIndex: number, eventualIndex
         gapToPlaceholderOffset: 0,  // Will be set below.
     }
 
-    addBottomPaddingCorrection();
-
     updatePlaceholderAndNoMoveZone(dragState.to);
+    updateBottomPaddingCorrection();
     showPlaceholder(dragState.to.placeholderEl);
 
     animateMoveInsideContainer(toEl, getItemsInContainerEndIndex(toEl), eventualIndex);
@@ -843,7 +843,7 @@ function leaveContainer() {
     }
 }
 
-function addBottomPaddingCorrection() {
+function updateBottomPaddingCorrection() {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     if (!dragState.to) return;
     const toEl = dragState.to.containerEl;
