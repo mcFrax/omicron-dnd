@@ -272,7 +272,6 @@ function startDrag() {
         // We will almost always override it with another animation of "insertion",
         // but sometimes it may happen that we actually leave the original container
         // immediately.
-        console.log('Animating');
         animateMoveInsideContainer(
             dragState.from.containerEl,
             dragState.from.index,
@@ -563,50 +562,33 @@ function updatePlaceholderAndNoMoveZone(to: InsertionPlaceCandidate): void {
 function findPlaceholderTop({
     containerEl: toEl,
     eventualIndex,
-}: InsertionPlace): number {
+    insertionIndex,
+    placeholderEl,
+}: InsertionPlaceCandidate): number {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
 
-    const {
-        containerEl: fromEl,
-        index: oldIndex,
-    } = dragState.from;
-    const isMove = dragState.dragKind === DragKind.Move;
 
-    let startIndex = getItemsInContainerStartIndex(toEl);
-    let endIndex = getItemsInContainerEndIndex(toEl);
-    let ref: HTMLElement|null, offsetCorrection: number;
-    if (endIndex === startIndex) {
-        // We don't have any reference, it will just be at the top.
-        // However, the offsetCorrection should probably account for
-        // margin/padding.
-        ref = null;
-        offsetCorrection = 0;
-    } else if (toEl === fromEl && isMove && eventualIndex === endIndex - 1) {
-        // Last element in fromEl.
-        ref = toEl.children[endIndex-1] as HTMLElement;
-        // Position the placeholder _after_ the ref.
-        offsetCorrection = ref.offsetHeight + 8 + dragState.pickedElToGapOffset;
-    } else if ((toEl !== fromEl || !isMove) && eventualIndex === endIndex) {
-        // Last element, not in fromEl.
-        ref = toEl.children[endIndex-1] as HTMLElement;
-        // Position the placeholder _after_ the ref.
-        offsetCorrection = ref.offsetHeight + 8;
-    } else if (toEl === fromEl && isMove && eventualIndex > oldIndex) {
-        ref = toEl.children[eventualIndex + 1] as HTMLElement
-        offsetCorrection = dragState.pickedElToGapOffset;
-    } else {
-        ref = toEl.children[eventualIndex] as HTMLElement
-        offsetCorrection = 0;
+    let ref: Element | null = null;
+    for (ref = toEl.children[insertionIndex-1];
+            ref && (getComputedStyle(ref).display === 'none' || ref === dragState.pickedEl);
+            ref = ref.previousElementSibling);
+
+    if (!ref) {
+        // Adding as the first element.
+        return getComputedStyleOr0(toEl, 'paddingTop');
     }
-    // Correct the ref if we hit an element with display: none.
-    // Thanks to endIndex check we know that the ref is either displayed
-    // itself or there is a displayed object below it, that we will eventually
-    // find..
-    while (ref && getComputedStyle(ref).display === 'none') {
-        ref = ref.nextElementSibling as HTMLElement;
-    }
-    // This will be the new activeEl's top as well, once we move it.
-    return ref ? ref.offsetTop + offsetCorrection : offsetCorrection;
+
+    // Position the placeholder _after_ the ref.
+    const placeholderTopMargin = getComputedStyleOr0(placeholderEl, 'marginTop');
+    const refBottomMargin = getComputedStyleOr0(placeholderEl, 'marginTop');
+    const marginCorrection = -refBottomMargin + Math.max(refBottomMargin, placeholderTopMargin);
+
+    const offsetCorrection =
+            (eventualIndex !== insertionIndex) ?
+                    dragState.pickedElToGapOffset : 0;
+
+    const ref2 = ref as HTMLElement;
+    return ref2.offsetTop + ref2.offsetHeight + marginCorrection + offsetCorrection;
 }
 
 function stateDrag_window_TouchCancel(event: TypedActiveEvent<TouchEvent, Document>) {

@@ -6,6 +6,7 @@ import { BadStateError, DragState, dragState, StateEnum } from "./state";
 
 type KnownLengthProperty =
     'marginBottom' | 'marginTop' | 'marginLeft' | 'marginRight' |
+    'paddingBottom' | 'paddingTop' | 'paddingLeft' | 'paddingRight' |
     'height' | 'width';
 
 export function getComputedStyleOr0(elem: Element | undefined | null, prop: KnownLengthProperty): number {
@@ -46,10 +47,15 @@ export function getGapBetweenSiblingsAfterItemRemoval(item: HTMLElement): number
     const topSibling = findPreviousStaticSibling(item);
     const bottomSibling = findNextStaticSibling(item);
 
-    if (!topSibling || !bottomSibling) return 0;
-
     const topSiblingMargin = getComputedStyleOr0(topSibling, 'marginBottom');
-    const bottomSiblingMargin = getComputedStyleOr0(topSibling, 'marginTop');
+    const bottomSiblingMargin = getComputedStyleOr0(bottomSibling, 'marginTop');
+
+    // If one of siblings is missing, we want to get the other sibling's
+    // distance from the padding, which is the same as relevant margin.
+
+    if (!topSibling && !bottomSibling) return 0;
+    if (!topSibling) return bottomSiblingMargin;
+    if (!bottomSibling) return topSiblingMargin;
 
     return Math.max(topSiblingMargin, bottomSiblingMargin);
 }
