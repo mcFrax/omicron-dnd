@@ -1,5 +1,4 @@
 import { ContainerEl } from "./expando";
-import { makeInvisible } from "./invisible-item";
 import { BadStateError, dragState, StateEnum } from "./state";
 
 const placeholders = new Map<HTMLElement, HTMLElement>();
