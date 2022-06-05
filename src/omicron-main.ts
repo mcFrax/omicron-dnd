@@ -531,7 +531,7 @@ function findPlaceholderTop({
     const marginCorrection = -refBottomMargin + Math.max(refBottomMargin, placeholderTopMargin);
 
     const offsetCorrection =
-            (eventualIndex !== insertionIndex) ?
+            (eventualIndex !== insertionIndex && eventualIndex > dragState.from.index) ?
                     dragState.pickedElToGapOffset : 0;
 
     const ref2 = ref as HTMLElement;
