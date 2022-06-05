@@ -13,6 +13,9 @@
     "drag"
   ],
   "scripts": {
+    "build": "webpack --mode production",
+    "build-dev": "webpack --mode development",
+    "build-watch": "webpack --mode development --watch",
     "test": "mocha -r ts-node/register -r jsdom-global/register src/**/*.spec.ts"
   },
   "devDependencies": {
