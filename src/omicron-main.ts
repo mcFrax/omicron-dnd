@@ -288,9 +288,6 @@ function startDrag() {
     if (typeof containerOptions.onDragStart === 'function') {
         containerOptions.onDragStart(dragState.from.containerEl, dragState.pickedEl);
     }
-    if (typeof containerOptions.onContainerEntered === 'function') {
-        containerOptions.onContainerEntered(dragState.from.containerEl, dragState.pickedEl);
-    }
 
     if (navigator.vibrate && containerData.options.dragStartVibration) {
         // Unfortunately doesn't work if this drag is the first user interaction
