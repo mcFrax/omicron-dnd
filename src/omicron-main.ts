@@ -430,7 +430,7 @@ function updateOnMove(evtPoint: EvPlace) {
     let updatedEventualIndex = findUpdatedEventualIndex(to.containerEl, evtPoint);
     let updatedInsertionIndex = insertionIndexFromEventualIndex(to.containerEl, updatedEventualIndex);
 
-    if (updatedEventualIndex != to.insertionIndex && !dragState.forbiddenIndices.isForbiddenIndex(to.containerEl, dragState.pickedEl, updatedInsertionIndex)) {
+    if (updatedInsertionIndex != to.insertionIndex && !dragState.forbiddenIndices.isForbiddenIndex(to.containerEl, dragState.pickedEl, updatedInsertionIndex)) {
         let previousEventualIndex = to.eventualIndex;
         to.eventualIndex = updatedEventualIndex;
         to.insertionIndex = updatedInsertionIndex;
