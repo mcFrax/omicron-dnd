@@ -7,7 +7,8 @@ import { BadStateError, DragState, dragState, StateEnum } from "./state";
 type KnownLengthProperty =
     'marginBottom' | 'marginTop' | 'marginLeft' | 'marginRight' |
     'paddingBottom' | 'paddingTop' | 'paddingLeft' | 'paddingRight' |
-    'height' | 'width';
+    'height' | 'width' | 'maxHeight' | 'maxWidth' |
+    'rowGap' | 'columnGap';
 
 export function getComputedStyleOr0(elem: Element | undefined | null, prop: KnownLengthProperty): number {
   if (!elem) return 0;
@@ -18,22 +19,30 @@ export function getEffectiveClientHeight(elem: Element): number {
   return elem.getClientRects()[0]?.height || 0;
 }
 
-export function getTopSiblingMargin(item: Element) {
-  return getComputedStyleOr0(findPreviousStaticSibling(item), 'marginBottom');
+export function getEffectiveMarginBetweenSiblings(
+  item1: Element | undefined,
+  item2: Element | undefined,
+): number {
+  const parent = (item1 ?? item2)?.parentElement;
+  if (!parent) return 0;
+  const margin1 = getComputedStyleOr0(item1, 'marginBottom');
+  const margin2 = getComputedStyleOr0(item2, 'marginTop');
+  const parentStyle = getComputedStyle(parent);
+  if (parentStyle.display === 'flex' || parentStyle.display === 'inline-flex') {
+    return margin1 + margin2 + parseFloat(parentStyle.rowGap);
+  }
+  // TODO: Handle negative margins?
+  // Here is the doc for margin collapsing:
+  // https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Box_Model/Mastering_margin_collapsing
+  return Math.max(margin1, margin2);
 }
 
-export function getBottomSiblingMargin(item: Element) {
-  return getComputedStyleOr0(findNextStaticSibling(item), 'marginTop');
+export function getEffectiveTopSiblingMargin(item: Element): number {
+  return getEffectiveMarginBetweenSiblings(findPreviousStaticSibling(item), item);
 }
 
-export function getEffectiveTopSiblingMargin(item: Element) {
-  const ownMargin = parseFloat(getComputedStyle(item).marginTop);
-  return Math.max(getTopSiblingMargin(item), ownMargin);
-}
-
-export function getEffectiveBottomSiblingMargin(item: Element) {
-  const ownMargin = parseFloat(getComputedStyle(item).marginBottom);
-  return Math.max(getBottomSiblingMargin(item), ownMargin);
+export function getEffectiveBottomSiblingMargin(item: Element): number {
+  return getEffectiveMarginBetweenSiblings(item, findNextStaticSibling(item));
 }
 
 export function getItemToNothingOffset(item: HTMLElement): number {
