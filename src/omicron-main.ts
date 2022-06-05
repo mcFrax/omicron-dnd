@@ -11,7 +11,7 @@ import { ForbiddenIndices } from "./forbidden-indices";
 import { containerHoverEntered, containerHoverLeft, getHoverContainersDeeperThan } from "./hover-tracker";
 import { eventualIndexFromInsertionIndex } from "./index-conversions";
 import { cancelInvisible, makeInvisible } from "./invisible-item";
-import { getComputedStyleOr0, getEffectiveClientHeight, getGapBetweenSiblingsAfterItemRemoval, getGapToPlaceholderOffset, getItemToNothingOffset, getOffsets } from "./offsets";
+import { getComputedStyleOr0, getEffectiveClientHeight, getEffectiveMarginBetweenSiblings, getGapBetweenSiblingsAfterItemRemoval, getGapToPlaceholderOffset, getItemToNothingOffset, getOffsets } from "./offsets";
 import { ContainerOptions } from "./options";
 import { disableOverscrollBehavior, revertOverscrollBehavior } from "./overscroll-behavior";
 import { clearPlaceholders, getOrCreatePlaceholder, hidePlaceholder, showPlaceholder } from "./placeholders";
@@ -535,16 +535,16 @@ function findPlaceholderTop({
     }
 
     // Position the placeholder _after_ the ref.
-    const placeholderTopMargin = getComputedStyleOr0(placeholderEl, 'marginTop');
     const refBottomMargin = getComputedStyleOr0(placeholderEl, 'marginTop');
-    const marginCorrection = -refBottomMargin + Math.max(refBottomMargin, placeholderTopMargin);
+    const marginCorrection = -refBottomMargin;
+    const margin = getEffectiveMarginBetweenSiblings(ref, placeholderEl);
 
     const offsetCorrection =
             (eventualIndex !== insertionIndex && eventualIndex > dragState.from.index) ?
                     dragState.pickedElToGapOffset : 0;
 
     const ref2 = ref as HTMLElement;
-    return ref2.offsetTop + ref2.offsetHeight + marginCorrection + offsetCorrection;
+    return ref2.offsetTop + ref2.offsetHeight + marginCorrection + margin + offsetCorrection;
 }
 
 function stateDrag_window_TouchCancel(event: TypedActiveEvent<TouchEvent, Document>) {

@@ -57,18 +57,7 @@ export function getItemToNothingOffset(item: HTMLElement): number {
 export function getGapBetweenSiblingsAfterItemRemoval(item: HTMLElement): number {
     const topSibling = findPreviousStaticSibling(item);
     const bottomSibling = findNextStaticSibling(item);
-
-    const topSiblingMargin = getComputedStyleOr0(topSibling, 'marginBottom');
-    const bottomSiblingMargin = getComputedStyleOr0(bottomSibling, 'marginTop');
-
-    // If one of siblings is missing, we want to get the other sibling's
-    // distance from the padding, which is the same as relevant margin.
-
-    if (!topSibling && !bottomSibling) return 0;
-    if (!topSibling) return bottomSiblingMargin;
-    if (!bottomSibling) return topSiblingMargin;
-
-    return Math.max(topSiblingMargin, bottomSiblingMargin);
+    return getEffectiveMarginBetweenSiblings(topSibling, bottomSibling);
 }
 
 export function getGapToPlaceholderOffset(to: InsertionPlaceCandidate): number {
@@ -98,15 +87,11 @@ export function getGapToPlaceholderOffset(to: InsertionPlaceCandidate): number {
         topSibling = (rangeEnd > rangeStart) ? to.containerEl.children[rangeEnd - 1] : undefined;
       }
   }
-  const topSiblingMargin = getComputedStyleOr0(topSibling, 'marginBottom');
-  const bottomSiblingMargin = getComputedStyleOr0(bottomSibling, 'marginTop');
 
-  const gap = (!topSibling || !bottomSibling) ? 0 : Math.max(topSiblingMargin, bottomSiblingMargin);
+  const gap = getEffectiveMarginBetweenSiblings(topSibling, bottomSibling);
 
-  const effectiveTopGap =
-      !topSibling ? 0 : Math.max(getComputedStyleOr0(to.placeholderEl, 'marginBottom'), topSiblingMargin);
-  const effectiveBottomGap =
-      !bottomSibling ? 0 : Math.max(getComputedStyleOr0(to.placeholderEl, 'marginTop'), bottomSiblingMargin);
+  const effectiveTopGap = getEffectiveMarginBetweenSiblings(topSibling, to.placeholderEl);
+  const effectiveBottomGap = getEffectiveMarginBetweenSiblings(to.placeholderEl, bottomSibling);
 
   return getEffectiveClientHeight(to.placeholderEl) + effectiveTopGap + effectiveBottomGap - gap;
 }
