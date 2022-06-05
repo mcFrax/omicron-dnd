@@ -14,6 +14,7 @@ import { cancelInvisible, makeInvisible } from "./invisible-item";
 import { getComputedStyleOr0, getEffectiveClientHeight, getGapBetweenSiblingsAfterItemRemoval, getGapToPlaceholderOffset, getItemToNothingOffset, getOffsets } from "./offsets";
 import { ContainerOptions } from "./options";
 import { disableOverscrollBehavior, revertOverscrollBehavior } from "./overscroll-behavior";
+import { clearPlaceholders, getOrCreatePlaceholder, hidePlaceholder, showPlaceholder } from "./placeholders";
 import { updateActiveScrollers, updateScrollers } from "./scrollers";
 import { disableUserSelectOnBody, revertUserSelectOnBody } from "./selection-control";
 import { BadStateError, dragState, PreDragState, setDragState, StateEnum } from "./state";
@@ -574,12 +575,10 @@ function exitDrag(execSort: boolean) {
     }
     if (dragState.state == StateEnum.PendingDrag) {
         dragState.floatEl.remove();  // Removing this element now saves some special casing.
-        if (dragState.to) {
-            dragState.to.placeholderEl.remove();
-        }
     } else {
         clearTimeout(dragState.preDragTimeoutId);
     }
+    clearPlaceholders();
 
     let insertEl: HTMLElement | null = null;
     let dragEndEvent: DragEndEvent | null;
@@ -805,14 +804,14 @@ function enterContainer(toEl: ContainerEl, insertionIndex: number, eventualIndex
         containerEl: toEl,
         insertionIndex,
         eventualIndex,
-        placeholderEl: createPlaceholder(toEl),
+        placeholderEl: getOrCreatePlaceholder(toEl),
         gapToPlaceholderOffset: 0,  // Will be set below.
     }
 
     addBottomPaddingCorrection();
 
     updatePlaceholderAndNoMoveZone(dragState.to);
-    dragState.to.placeholderEl.style.visibility = 'visible';
+    showPlaceholder(dragState.to.placeholderEl);
 
     animateMoveInsideContainer(toEl, getItemsInContainerEndIndex(toEl), eventualIndex);
 
@@ -830,7 +829,7 @@ function leaveContainer() {
 
     const leftContainerEl = dragState.to.containerEl;
 
-    dragState.to.placeholderEl.remove();
+    hidePlaceholder(dragState.to.placeholderEl);
 
     animateMoveInsideContainer(leftContainerEl, dragState.to.eventualIndex, getItemsInContainerEndIndex(leftContainerEl));
 
@@ -844,40 +843,13 @@ function leaveContainer() {
     }
 }
 
-function createPlaceholder(toEl: ContainerEl) {
-    if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
-    const placeholderEl = document.createElement('div');
-    placeholderEl.style.position = 'absolute';
-    placeholderEl.style.top = '0';
-    placeholderEl.style.zIndex = '1';
-    placeholderEl.style.background = 'lightgray';
-    placeholderEl.style.userSelect = 'none';
-    placeholderEl.style.pointerEvents = 'none';
-    placeholderEl.style.visibility = 'hidden';
-    placeholderEl.classList.add('drag-placeholder');
-    // Note: that may be before or after floatEl. Maybe that is the problem?
-    toEl.appendChild(placeholderEl);
-    // Set the height only if not set externally.
-    let autoHeight = getComputedStyle(placeholderEl).height;
-    if (!autoHeight || autoHeight === '0px') {
-        placeholderEl.style.height = Math.min(dragState.initialPickupRect.height - 16, 200) + 'px';
-    }
-    // TODO: Figure out how to determine these properly. I guess we need to take
-    // the container's clientWidth and make the actual math with margins and
-    // stuff.
-    // For now let's assume that the offsets on activeEl are ok and that
-    // they are the same on both sides.
-    placeholderEl.style.left = dragState.pickedEl.offsetLeft + 'px';
-    placeholderEl.style.right = dragState.pickedEl.offsetLeft + 'px';
-    return placeholderEl;
-}
-
 function addBottomPaddingCorrection() {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
-    if (dragState.to && dragState.to.containerEl !== dragState.from.containerEl) {
-        const toEl = dragState.to.containerEl;
+    if (!dragState.to) return;
+    const toEl = dragState.to.containerEl;
+    if (toEl && toEl !== dragState.from.containerEl && !toEl.style.paddingBottom) {
         toEl.style.paddingBottom =
-            parseFloat(getComputedStyle(toEl).paddingBottom.slice(0, -2)) + dragState.to.gapToPlaceholderOffset + 'px';
+            getComputedStyleOr0(toEl, 'paddingBottom') + dragState.to.gapToPlaceholderOffset + 'px';
     }
 }
 
