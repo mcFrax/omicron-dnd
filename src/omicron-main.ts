@@ -658,7 +658,7 @@ function exitDrag(execSort: boolean) {
         }
 
         // We removed pickedEl before, so now we insert simply at eventualIndex.
-        if (eventualIndex === toEl.children.length) {
+        if (eventualIndex >= toEl.children.length) {
             toEl.appendChild(insertEl);
         } else {
             toEl.children[eventualIndex].before(insertEl);
