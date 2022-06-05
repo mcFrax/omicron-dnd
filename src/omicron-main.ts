@@ -316,7 +316,7 @@ function startDrag() {
     updateOnMove({
       clientX: dragState.currentPointerPos.x,
       clientY: dragState.currentPointerPos.y,
-    });
+    }, dragState.from.containerEl);
 }
 function statePreDrag_window_TouchStart(event: TypedActiveEvent<TouchEvent, Document>) {
     if (dragState && event.touches.length !== 1) {
@@ -412,13 +412,13 @@ function handleMove(evtPoint: EvPlace) {
 
 // This is to be called both when pointer moves, and to invoke synthetic update
 // after scroll and on drag start.
-function updateOnMove(evtPoint: EvPlace) {
+function updateOnMove(evtPoint: EvPlace, ignoreGuardsOn?: ContainerEl) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     // If we are hovering over some containers that are descendants
     // of toEl but we didn't enter them yet for any reason, let's reconsider.
     const toElDomDepth = dragState.to ? dragState.to.containerEl[expando].domDepth : -1;
     for (const hoverContainer of getHoverContainersDeeperThan(toElDomDepth)) {
-        if (maybeEnterContainer(hoverContainer, evtPoint)) {
+        if (maybeEnterContainer(hoverContainer, evtPoint, hoverContainer.el === ignoreGuardsOn)) {
             // enterContainer took take care of handling the new position
             // and animation, so our work here is done.
             return;
@@ -790,7 +790,7 @@ function anyState_container_PointerLeave(event: TypedActiveEvent<PointerEvent, C
     }, 0);
 }
 
-function maybeEnterContainer(containerData: ContainerData, evPlace: EvPlace) {
+function maybeEnterContainer(containerData: ContainerData, evPlace: EvPlace, ignoreGuards?: boolean) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     let cData = containerData;
     let rect = cData.el.getClientRects()[0];
@@ -798,8 +798,9 @@ function maybeEnterContainer(containerData: ContainerData, evPlace: EvPlace) {
         return false;
     }
     const xLast = dragState.currentPointerPos.x;
-    if (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
-            xLast <= rect.right - rect.width * cData.options.enterGuardRight - cData.options.enterGuardRightPx) {
+    if (ignoreGuards ||
+            (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
+            xLast <= rect.right - rect.width * cData.options.enterGuardRight - cData.options.enterGuardRightPx)) {
         const insertionIndex = findUpdatedInsertionIndex(cData.el, evPlace);
         const eventualIndex = eventualIndexFromInsertionIndex(cData.el, insertionIndex);
         if (!dragState.forbiddenIndices.isForbiddenIndex(cData.el, dragState.pickedEl, insertionIndex)) {
