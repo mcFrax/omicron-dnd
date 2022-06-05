@@ -15,9 +15,14 @@ module.exports = {
   resolve: {
     extensions: ['.ts', '.js'],
   },
+  experiments: {
+    outputModule: true,
+  },
   output: {
     filename: 'omicron-dnd.js',
-    library: 'OmicronDnd',
+    library: {
+      type: 'module',
+    },
     path: path.resolve(__dirname, 'dist'),
   },
   devServer: {

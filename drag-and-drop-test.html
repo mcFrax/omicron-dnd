@@ -212,6 +212,16 @@
             </p>
             <code id="no-sortable-error-text"></code>
         </div>
+        <div id="modules-error-dialog" class="failure-dialog">
+            <p>
+                Unfortunately, ES6 modules don't work in files open from
+                disk. Start a python server instead, and open the page
+                through network.
+            </p>
+            <code>
+                python3 -m http.server
+            </code>
+        </div>
     </div>
     <div id="log-container">
         <div>
@@ -220,8 +230,7 @@
         </div>
         <div id="log-content"></div>
     </div>
-    <script src="./dist/omicron-dnd.js"></script>
-    <script>
+    <script type="module">
         let urlParams = new URLSearchParams(document.location.search);
 
         const monkeyPatching = urlParams.get('enableTracking') === '1' || urlParams.get('enableTracking') === 'true';
@@ -316,10 +325,10 @@
             console.log('console.log and dispatchEvent monkey patched.');
         }
     </script>
-    <script>
+    <script type="module">
     // Top-level async doesn't work in Safari <= 14, so we wrap everything
     // in an async function instead.
-    window.onload = (async () => {
+    (async () => {
 
         let $ = (s) => document.querySelector(s);
         let $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -353,6 +362,7 @@
         // global handler firing when testing Omicron.
         // This also allows to employ cache-busting for Omicron.
         let Sortable;
+        let OmicronDnd;
         if (useSortable) {
             try {
                 const sortableModule = await import('./sortable.core.esm.js');
@@ -365,6 +375,18 @@
                 console.error('Failed to load Sortable.');
                 document.getElementById('no-sortable-error-text').textContent = e.toString();
                 document.getElementById('no-sortable-error-dialog').style.display = 'block';
+            }
+        } else {
+            const enableCacheBusting = ['1', 'true'].includes(urlParams.get('jsCacheBusting'));
+            const urlSuffix =
+                    enableCacheBusting ?
+                        '?cacheBusting=' + Math.round(Math.random() * 0xFFFFFFF).toString(36) :
+                        '';
+            try {
+                const omicronModule = await import('./dist/omicron-dnd.js' + urlSuffix);
+                OmicronDnd = omicronModule.default;
+            } catch (e) {
+                console.error('Failed to load Omicron.');
             }
         }
 
@@ -538,7 +560,12 @@
             // initContainer functions.
             containerEl.addEventListener('click', deferredItemClickHandler);
         }
-    });
+    })();
+    </script>
+    <script>
+        if (location.protocol === 'file:') {
+            document.getElementById('modules-error-dialog').style.display = 'block';
+        }
     </script>
 </body>
 </html>

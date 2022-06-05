@@ -3,7 +3,7 @@ import { animateMoveInsideContainer } from "./animate-move";
 import { Anim, animMs } from "./anims";
 import { EvPlace, InsertionPlaceCandidate } from "./base-types";
 import { preventImmediateClick } from "./click-blocker";
-import { getItemFromContainerEvent, getItemsInContainerEndIndex, getItemsInContainerStartIndex, hasContainerAncestor } from "./dom-traversal";
+import { getItemFromContainerEvent, getItemsInContainerEndIndex, getItemsInContainerStartIndex, hasContainerAncestor, isOrderable } from "./dom-traversal";
 import { cancelIfCancellable, cancelIfOmicronActive, toggleListeners, TypedActiveEvent } from "./event-utils";
 import { ContainerData, ContainerEl, expando } from "./expando";
 import { DragEndEvent, DragKind } from "./external-types";
@@ -19,7 +19,12 @@ import { updateActiveScrollers, updateScrollers } from "./scrollers";
 import { disableUserSelectOnBody, revertUserSelectOnBody } from "./selection-control";
 import { BadStateError, dragState, PreDragState, setDragState, StateEnum } from "./state";
 import { updateFloatElOnNextFrame } from "./update-float-el-on-next-frame";
-export * from "./external-types";
+export type {
+    BaseDragEndEvent,
+    FailedDragEndEvent,
+    SuccessfulDragEndEvent,
+    DragEndEvent,
+} from "./external-types";
 
 declare global {
     interface Node {
@@ -30,7 +35,7 @@ declare global {
     }
 }
 
-export function init(container: HTMLElement, options?: Partial<ContainerOptions>) {
+function init(container: HTMLElement, options?: Partial<ContainerOptions>) {
     if (container[expando]) {
         return;  // Ignore repeated calls.
     }
@@ -466,7 +471,7 @@ function findUpdatedInsertionIndex(containerEl: ContainerEl, evtPoint: EvPlace):
             insertionIndexCandidate < endIndex;
             ++insertionIndexCandidate) {
         const ref = containerEl.children[insertionIndexCandidate];
-        if (getComputedStyle(ref).display === 'none') {
+        if (!isOrderable(ref)) {
             continue;
         }
         if (!(ref instanceof HTMLElement)) {
@@ -519,10 +524,9 @@ function findPlaceholderTop({
 }: InsertionPlaceCandidate): number {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
 
-
     let ref: Element | null = null;
     for (ref = toEl.children[insertionIndex-1];
-            ref && (getComputedStyle(ref).display === 'none' || ref === dragState.pickedEl);
+            ref && (ref === dragState.pickedEl || !isOrderable(ref));
             ref = ref.previousElementSibling);
 
     if (!ref) {
@@ -910,3 +914,8 @@ function createFloatEl(dragState: PreDragState): HTMLElement {
 
     return floatEl;
 }
+
+export default {
+    init,
+    DragKind,
+};

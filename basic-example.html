@@ -20,6 +20,10 @@
         border-radius: 1rem;
         cursor: pointer;
       }
+
+      ul>.drag-placeholder {
+        margin: 4px 0;
+      }
     </style>
   </head>
   <body>
@@ -30,10 +34,8 @@
       <li>It's that simple! 😃👍</li>
     </ul>
   </body>
-  <script src="./dist/omicron-dnd.js"></script>
-  <script>
-    window.onload = () => {
-      OmicronDnd.init(document.getElementById('list'));
-    };
+  <script type="module">
+    import OmicronDnd from './dist/omicron-dnd.js';
+    OmicronDnd.init(document.getElementById('list'));
   </script>
 </html>
