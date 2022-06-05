@@ -29,7 +29,9 @@ export function getEffectiveMarginBetweenSiblings(
   const margin2 = getComputedStyleOr0(item2, 'marginTop');
   const parentStyle = getComputedStyle(parent);
   if (parentStyle.display === 'flex' || parentStyle.display === 'inline-flex') {
-    return margin1 + margin2 + parseFloat(parentStyle.rowGap);
+    // row-gap may be 'normal', which would parse to NaN - we need to manually
+    // collapse it to 0.
+    return margin1 + margin2 + (parseFloat(parentStyle.rowGap) || 0);
   }
   // TODO: Handle negative margins?
   // Here is the doc for margin collapsing:
