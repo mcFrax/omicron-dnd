@@ -449,17 +449,6 @@ function findUpdatedInsertionIndex(containerEl: HTMLElement, evtPoint: EvPlace):
     // perhaps at this place.
     let mouseY = evtPoint.clientY - containerEl.getClientRects()[0].top;
 
-    if (dragState.to && dragState.to.containerEl === containerEl) {
-        const {
-            yStartNoMoveZone,
-            yEndNoMoveZone,
-            insertionIndex,
-        } = dragState.to;
-        if (mouseY >= yStartNoMoveZone && mouseY <= yEndNoMoveZone) {
-            return insertionIndex;
-        }
-    }
-
     const {
         containerEl: fromEl,
         index: fromIndex,
@@ -500,9 +489,7 @@ function findUpdatedInsertionIndex(containerEl: HTMLElement, evtPoint: EvPlace):
 
 function updatePlaceholderAndNoMoveZone(to: InsertionPlaceCandidate): void {
     let newPlaceholderTop = findPlaceholderTop(to);
-    to.yStartNoMoveZone = newPlaceholderTop + getComputedStyleOr0(to.placeholderEl, 'marginTop');
     to.gapToPlaceholderOffset = getGapToPlaceholderOffset(to);
-    to.yEndNoMoveZone = to.yStartNoMoveZone + getComputedStyleOr0(to.placeholderEl, 'height');
     to.placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
 }
 
@@ -820,8 +807,6 @@ function enterContainer(toEl: ContainerEl, insertionIndex: number, eventualIndex
         eventualIndex,
         placeholderEl: createPlaceholder(toEl),
         gapToPlaceholderOffset: 0,  // Will be set below.
-        yStartNoMoveZone: 0,
-        yEndNoMoveZone: 0,
     }
 
     addBottomPaddingCorrection();

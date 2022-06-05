@@ -38,8 +38,4 @@ export type InsertionPlaceCandidate = InsertionPlace & {
   // The offset by which the items below placeholder should be moved visually
   // to accomodate the placeholder.
   gapToPlaceholderOffset: number
-  // Cached y-range such that until pointer leaves it, the target index won't
-  // change.
-  yStartNoMoveZone: number
-  yEndNoMoveZone: number
 }
