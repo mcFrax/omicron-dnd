@@ -1,6 +1,6 @@
 
 import { animateMoveInsideContainer } from "./animate-move";
-import { Anim, animMs } from "./anims";
+import { startAnim, animMs } from "./anims";
 import { EvPlace, InsertionPlaceCandidate } from "./base-types";
 import { preventImmediateClick } from "./click-blocker";
 import { getItemFromContainerEvent, getItemsInContainerEndIndex, getItemsInContainerStartIndex, hasContainerAncestor, isOrderable } from "./dom-traversal";
@@ -652,8 +652,10 @@ function exitDrag(execSort: boolean) {
             // We assume that they're offset position was changed by
             // pickedElToGapOffset, so we immediately subtract that from
             // their translation.
-            for (let elem of Array.from(fromEl.children).slice(fromIndex) as HTMLElement[]) {
-                Anim.start(fromEl, [elem], 0, animMs, immediateTranslation);
+            for (let elem of Array.from(fromEl.children).slice(fromIndex)) {
+                if (elem instanceof HTMLElement) {
+                    startAnim(elem, 'translateY', immediateTranslation, 0, animMs);
+                }
             }
         }
 
@@ -666,8 +668,10 @@ function exitDrag(execSort: boolean) {
 
         const immediateTranslation2 = (currentY: number) => currentY + pickedElToGapOffset;
         // Adjust elements after inserted and animate them to 0.
-        for (let elem of Array.from(toEl.children).slice(eventualIndex + 1) as HTMLElement[]) {
-            Anim.start(fromEl, [elem], 0, animMs, immediateTranslation2);
+        for (let elem of Array.from(toEl.children).slice(eventualIndex + 1)) {
+            if (elem instanceof HTMLElement) {
+                startAnim(elem, 'translateY', immediateTranslation2, 0, animMs);
+            }
         }
     } else {
         dragEndEvent = {
@@ -680,8 +684,11 @@ function exitDrag(execSort: boolean) {
 
         // When cancelling, let's simply tell everyone to go home.
         for (let cont of [dragState.from.containerEl, dragState.to?.containerEl]) {
-            if (cont) {  // toEl may be missing.
-                Anim.start(cont, Array.from(cont.children) as HTMLElement[], 0, animMs);
+            if (!cont) continue;  // toEl may be missing.
+            for (const elem of cont.children) {
+                if (elem instanceof HTMLElement) {
+                    startAnim(elem, 'translateY', 'current', 0, animMs);
+                }
             }
         }
     }
@@ -690,10 +697,10 @@ function exitDrag(execSort: boolean) {
 
     if (dragState.state == StateEnum.PendingDrag) {
         let animElem = insertEl ?? dragState.pickedEl;
-        // Our Anim handles only y animation for now, we should fix that.
-        // However, let's at least handle the y.
         let destRect = animElem.getClientRects()[0];
-        Anim.start(animElem, [animElem], 0, animMs, dragState.floatElPos.y - destRect.top);
+        const animTimeMs = 2 * animMs;
+        startAnim(animElem, 'translateX', dragState.floatElPos.x - destRect.left, 0, animTimeMs);
+        startAnim(animElem, 'translateY', dragState.floatElPos.y - destRect.top, 0, animTimeMs);
 
         if (dragState.to) {
             removeBottomPaddingCorrection(dragState.to.containerEl);

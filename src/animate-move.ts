@@ -1,4 +1,4 @@
-import { Anim, animMs } from "./anims";
+import { startAnim, animMs } from "./anims";
 import { getItemsInContainerEndIndex } from "./dom-traversal";
 import { DragKind } from "./external-types";
 import { getOffsets } from "./offsets";
@@ -61,14 +61,16 @@ export function animateMoveInsideContainer(containerEl: HTMLElement, previousEve
             i >= dragState.from.index);
         let afterNew = afterOld ? i > newEventualIndex : i >= newEventualIndex;
 
+        let newTranslation: number;
         if (afterNew && afterOld) {
-            Anim.start(containerEl, [otherEl], pickedToPlaceholderOffset, animMs);
+            newTranslation = pickedToPlaceholderOffset;
         } else if (afterNew) {
-            Anim.start(containerEl, [otherEl], gapToPlaceholderOffset, animMs);
+            newTranslation = gapToPlaceholderOffset;
         } else if (afterOld) {
-            Anim.start(containerEl, [otherEl], dragState.pickedElToGapOffset, animMs);
+            newTranslation = dragState.pickedElToGapOffset;
         } else {
-            Anim.start(containerEl, [otherEl], 0, animMs);
+            newTranslation = 0;
         }
+        startAnim(otherEl, 'translateY', 'current', newTranslation, animMs);
     }
 }
