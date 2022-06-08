@@ -50,11 +50,9 @@
     </div>
   </body>
   <script type="module">
-    import OmicronDnd from './omicron-dnd.js';
+    import OmicronDnd from './dist/omicron-dnd.js';
     for (const ulElem of document.getElementsByTagName('ul')) {
-      OmicronDnd.init(ulElem, {
-        allowPull: OmicronDnd.DragKind.Copy,
-      });
+      OmicronDnd.init(ulElem);
     }
   </script>
 </html>
