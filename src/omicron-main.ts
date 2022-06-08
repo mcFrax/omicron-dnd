@@ -666,7 +666,17 @@ function exitDrag(execSort: boolean) {
             toEl.children[eventualIndex].before(insertEl);
         }
 
-        const immediateTranslation2 = (currentY: number) => currentY + pickedElToGapOffset;
+        // TODO: Genericly handle pickedEl size change after insertion.
+        // As here we actually performed the insertion ourselves, we can simply
+        // recompute pickedElToGapOffset. This may not be available in the
+        // future, if we add option to let the user handle the move manually.
+        // OTOH, we can still offer something like moving the item, taking
+        // measurement, moving it back (or moving in a clone and then deleting
+        // it) so that we can animate floatEl accordingly.
+        const pickedElToGapOffset2 =
+                getItemToNothingOffset(insertEl) +
+                    getGapBetweenSiblingsAfterItemRemoval(insertEl);
+        const immediateTranslation2 = (currentY: number) => currentY + pickedElToGapOffset2;
         // Adjust elements after inserted and animate them to 0.
         for (let elem of Array.from(toEl.children).slice(eventualIndex + 1)) {
             if (elem instanceof HTMLElement) {
