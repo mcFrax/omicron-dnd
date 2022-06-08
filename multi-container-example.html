@@ -5,11 +5,17 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimal-ui" />
     <title>Omicron-dnd basic example</title>
     <style>
+      .row {
+        display: flex;
+        flex-direction: row;
+      }
+
       ul {
         display: inline-block;
         padding: 8px;
         margin: 4px;
         border: 4px solid maroon;
+        flex: 1 0 30%;
       }
 
       li {
@@ -23,9 +29,15 @@
         cursor: pointer;
       }
 
-      .row {
-        display: inline-flex;
-        flex-direction: row;
+      .visible-stylesheet {
+        display: block;
+        white-space: pre-wrap;
+        font-family: monospace;
+
+        font-size: 1.2rem;
+        margin: 4px;
+        border: 2px solid limegreen;
+        background-color: rgb(231, 231, 231);
       }
     </style>
   </head>
@@ -48,6 +60,23 @@
         <li>And blazing performance 🔥🚀</li>
       </ul>
     </div>
+    <style class="visible-stylesheet">
+      .drag-placeholder {
+        background:
+          repeating-linear-gradient(-45deg,
+            transparent 0 4px,
+            black 4px 8px);
+        opacity: 0.4;
+        border-radius: 8px;
+      }
+      .drag-float-item {
+        opacity: 0.8;
+        box-shadow:
+          0 2px 4px -2px rgba(0, 0, 0, 0.2),
+          0 4px 5px  0   rgba(0, 0, 0, 0.14),
+          0 1px 10px 0   rgba(0, 0, 0, 0.12);
+      }
+    </style>
   </body>
   <script type="module">
     import OmicronDnd from './dist/omicron-dnd.js';
