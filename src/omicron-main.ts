@@ -317,7 +317,7 @@ function startDrag() {
                 containerData,
                 startEvPoint,
                 true,
-                dragState.from.index + 1,
+                dragState.from.index,
             )
     ) {
         // Synthethic update, to determine the insertion point.
@@ -490,11 +490,11 @@ function findUpdatedInsertionIndex(containerEl: ContainerEl, evtPoint: EvPlace):
             continue;
         }
         let eventualIndexCandidate = insertionIndexCandidate;
-        if (containerEl === fromEl) {
+        if (isMove && containerEl === fromEl) {
             if (insertionIndexCandidate === fromIndex) {
                 continue;
             }
-            if (insertionIndexCandidate > fromIndex && isMove) {
+            if (insertionIndexCandidate > fromIndex) {
                 offsetCorrection = dragState.pickedElToGapOffset;
                 eventualIndexCandidate -= 1;
             }
@@ -535,10 +535,11 @@ function findPlaceholderTop({
     placeholderEl,
 }: InsertionPlaceCandidate): number {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
+    const isMove = dragState.dragKind === DragKind.Move;
 
     let ref: Element | null = null;
     for (ref = toEl.children[insertionIndex-1];
-            ref && (ref === dragState.pickedEl || !isOrderable(ref));
+            ref && (ref === dragState.pickedEl && isMove || !isOrderable(ref));
             ref = ref.previousElementSibling);
 
     if (!ref) {
@@ -620,7 +621,8 @@ function exitDrag(execSort: boolean) {
     if (execSort &&
             dragState.state === StateEnum.PendingDrag &&
             dragState.to &&
-            (dragState.to.containerEl !== dragState.from.containerEl ||
+            (dragState.dragKind !== DragKind.Move ||
+                dragState.to.containerEl !== dragState.from.containerEl ||
                 dragState.to.eventualIndex !== dragState.from.index)
     ) {
         insertEl = (dragState.dragKind === DragKind.Move) ? dragState.pickedEl : dragState.pickedEl.cloneNode(true);
