@@ -110,7 +110,7 @@ function paramAnimationFrame(
     if (advancementRate >= 1) {
         anims.pendingCount -= 1;
         anim.pending = false;
-        if (anim.currentValue === 0) {
+        if (anim.currentValue === defaultForTransform[anim.transform]) {
             // Remove the transform.
             anims.allTransforms[animIdx] = anims.allTransforms[anims.allTransforms.length - 1];
             anims.allTransforms.pop();
