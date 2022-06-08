@@ -35,13 +35,16 @@ function createPlaceholder(toEl: ContainerEl) {
     placeholderEl.style.position = 'absolute';
     placeholderEl.style.top = '0';
     placeholderEl.style.zIndex = '1';
-    placeholderEl.style.background = 'lightgray';
     placeholderEl.style.userSelect = 'none';
     placeholderEl.style.pointerEvents = 'none';
     placeholderEl.style.visibility = 'hidden';
     placeholderEl.style.opacity = '0';
     placeholderEl.classList.add('drag-placeholder');
     toEl.appendChild(placeholderEl);
+    // Set background only if not set externally.
+    if (getComputedStyle(placeholderEl).backgroundColor !== 'rgba(0, 0, 0, 0)') {
+        placeholderEl.style.background = 'lightgray';
+    }
     // Set the height only if not set externally.
     let autoHeight = getComputedStyle(placeholderEl).height;
     if (!autoHeight || autoHeight === '0px') {
