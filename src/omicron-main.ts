@@ -308,12 +308,21 @@ function startDrag() {
         },
     });
 
-    // Synthethic update, to determine the insertion point.
-    // TODO: We might need to give it a hint that this is a drag start, after all.
-    updateOnMove({
-      clientX: dragState.currentPointerPos.x,
-      clientY: dragState.currentPointerPos.y,
-    }, dragState.from.containerEl);
+    const startEvPoint = {
+        clientX: dragState.currentPointerPos.x,
+        clientY: dragState.currentPointerPos.y,
+    };
+
+    if (!containerData.options.keepPositionOnDragStart || !maybeEnterContainer(
+                containerData,
+                startEvPoint,
+                true,
+                dragState.from.index + 1,
+            )
+    ) {
+        // Synthethic update, to determine the insertion point.
+        updateOnMove(startEvPoint);
+    }
 }
 function statePreDrag_window_TouchStart(event: TypedActiveEvent<TouchEvent, Document>) {
     if (dragState && event.touches.length !== 1) {
@@ -407,15 +416,21 @@ function handleMove(evtPoint: EvPlace) {
     updateOnMove(evtPoint);
 }
 
+type ContainerEnterHint = {
+    containerEl: ContainerEl,
+    insertionIndex: number,
+    ignoreGuards?: boolean,
+};
+
 // This is to be called both when pointer moves, and to invoke synthetic update
 // after scroll and on drag start.
-function updateOnMove(evtPoint: EvPlace, ignoreGuardsOn?: ContainerEl) {
+function updateOnMove(evtPoint: EvPlace) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     // If we are hovering over some containers that are descendants
     // of toEl but we didn't enter them yet for any reason, let's reconsider.
     const toElDomDepth = dragState.to ? dragState.to.containerEl[expando].domDepth : -1;
     for (const hoverContainer of getHoverContainersDeeperThan(toElDomDepth)) {
-        if (maybeEnterContainer(hoverContainer, evtPoint, hoverContainer.el === ignoreGuardsOn)) {
+        if (maybeEnterContainer(hoverContainer, evtPoint)) {
             // enterContainer took take care of handling the new position
             // and animation, so our work here is done.
             return;
@@ -805,7 +820,7 @@ function anyState_container_PointerLeave(event: TypedActiveEvent<PointerEvent, C
     }, 0);
 }
 
-function maybeEnterContainer(containerData: ContainerData, evPlace: EvPlace, ignoreGuards?: boolean) {
+function maybeEnterContainer(containerData: ContainerData, evPlace: EvPlace, ignoreGuards?: boolean, forceInsertionIndex?: number) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     let cData = containerData;
     let rect = cData.el.getClientRects()[0];
@@ -816,7 +831,7 @@ function maybeEnterContainer(containerData: ContainerData, evPlace: EvPlace, ign
     if (ignoreGuards ||
             (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
             xLast <= rect.right - rect.width * cData.options.enterGuardRight - cData.options.enterGuardRightPx)) {
-        const insertionIndex = findUpdatedInsertionIndex(cData.el, evPlace);
+        const insertionIndex = forceInsertionIndex ?? findUpdatedInsertionIndex(cData.el, evPlace);
         const eventualIndex = eventualIndexFromInsertionIndex(cData.el, insertionIndex);
         if (!dragState.forbiddenIndices.isForbiddenIndex(cData.el, dragState.pickedEl, insertionIndex)) {
             enterContainer(cData.el, insertionIndex, eventualIndex);

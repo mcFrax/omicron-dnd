@@ -63,6 +63,10 @@ export class ContainerOptions {
     enterGuardLeftPx: number = 0;
     enterGuardRight: number = 0;
     enterGuardRightPx: number = 0;
+    // If true, the dragged element will hover over the place where it was
+    // dragged from on the drag start, regardless of pointer position, but only
+    // if this is a legal drop spot.
+    keepPositionOnDragStart: boolean = true;
     // forbiddenInsertionIndicesFn can be used to make some indices invalid
     // as newIndex.
     // When entering new container (as toEl), forbiddenInsertionIndicesFn
