@@ -1,6 +1,6 @@
 
 import { animateMoveInsideContainer } from "./animate-move";
-import { startAnim, animMs } from "./anims";
+import { setTransform, animMs } from "./anims";
 import { EvPlace, InsertionPlaceCandidate } from "./base-types";
 import { preventImmediateClick } from "./click-blocker";
 import { getItemFromContainerEvent, getItemsInContainerEndIndex, getItemsInContainerStartIndex, hasContainerAncestor, isOrderable } from "./dom-traversal";
@@ -654,7 +654,7 @@ function exitDrag(execSort: boolean) {
             // their translation.
             for (let elem of Array.from(fromEl.children).slice(fromIndex)) {
                 if (elem instanceof HTMLElement) {
-                    startAnim(elem, 'translateY', immediateTranslation, 0, animMs);
+                    setTransform(elem, 'translateY', immediateTranslation, 0, animMs);
                 }
             }
         }
@@ -670,7 +670,7 @@ function exitDrag(execSort: boolean) {
         // Adjust elements after inserted and animate them to 0.
         for (let elem of Array.from(toEl.children).slice(eventualIndex + 1)) {
             if (elem instanceof HTMLElement) {
-                startAnim(elem, 'translateY', immediateTranslation2, 0, animMs);
+                setTransform(elem, 'translateY', immediateTranslation2, 0, animMs);
             }
         }
     } else {
@@ -687,7 +687,7 @@ function exitDrag(execSort: boolean) {
             if (!cont) continue;  // toEl may be missing.
             for (const elem of cont.children) {
                 if (elem instanceof HTMLElement) {
-                    startAnim(elem, 'translateY', 'current', 0, animMs);
+                    setTransform(elem, 'translateY', 'current', 0, animMs);
                 }
             }
         }
@@ -699,8 +699,9 @@ function exitDrag(execSort: boolean) {
         let animElem = insertEl ?? dragState.pickedEl;
         let destRect = animElem.getClientRects()[0];
         const animTimeMs = 2 * animMs;
-        startAnim(animElem, 'translateX', dragState.floatElPos.x - destRect.left, 0, animTimeMs);
-        startAnim(animElem, 'translateY', dragState.floatElPos.y - destRect.top, 0, animTimeMs);
+        setTransform(animElem, 'translateX', dragState.floatElPos.x - destRect.left, 0, animTimeMs);
+        setTransform(animElem, 'translateY', dragState.floatElPos.y - destRect.top, 0, animTimeMs);
+        setTransform(animElem, 'scale', dragState.floatElScale, 1, animTimeMs);
 
         if (dragState.to) {
             removeBottomPaddingCorrection(dragState.to.containerEl);

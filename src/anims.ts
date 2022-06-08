@@ -13,6 +13,12 @@ const unitForTransform: Record<TransformName, TransformUnit> = {
     scale: '',
     rotate: 'deg',
 };
+const defaultForTransform: Record<TransformName, number> = {
+    translateX: 0,
+    translateY: 0,
+    scale: 1,
+    rotate: 0,
+};
 
 
 type MaybeAnimTimespan = {
@@ -112,38 +118,57 @@ function paramAnimationFrame(
     }
 }
 
-export function startAnim(
+export function setTransform(
     elem: HTMLElement,
     transform: TransformName,
     startValueOrFn: 'current'|number|((previous: number) => number),
-    targetValueOrFn: number|((startValue: number, previous: number) => number),
-    durationMs: number,
+    targetValueOrFn?: undefined,
+    durationMs?: undefined,
+): void;
+export function setTransform(
+    elem: HTMLElement,
+    transform: TransformName,
+    startValueOrFn: 'current'|number|((previous: number) => number),
+    targetValueOrFn?: number|((startValue: number, previous: number) => number)|undefined,
+    durationMs?: number,
+): void;
+
+export function setTransform(
+    elem: HTMLElement,
+    transform: TransformName,
+    startValueOrFn: 'current'|number|((previous: number) => number),
+    targetValueOrFn: number|((startValue: number, previous: number) => number)|undefined,
+    durationMs: number = animMs,
 ) {
     const preExistingElemAnims = elemsWithTransforms.get(elem);
     const preExisiting = getAnim(elem, transform);
-    const previousValue = preExisiting?.currentValue ?? 0;
+    const previousValue = preExisiting?.currentValue ?? defaultForTransform[transform];
     const startValue =
         (startValueOrFn ===  'current') ? previousValue :
             (typeof startValueOrFn === 'function') ?
-                startValueOrFn(previousValue) : previousValue;
+                startValueOrFn(previousValue) : startValueOrFn;
 
-    const targetValue = (typeof targetValueOrFn === 'function') ?
+    const targetValue = targetValueOrFn === undefined ? startValue :
+            (typeof targetValueOrFn === 'function') ?
                 targetValueOrFn(startValue, previousValue) : targetValueOrFn;
 
-    const unit = unitForTransform[transform];
+    if (targetValue === startValue) {
+        durationMs = 0;
+    }
+    const pendingDiff = 1 - Number(preExisiting?.pending ?? 0);
 
     const anim: SingleParamAnim =
         Object.assign(
             preExisiting ?? {
                 elem,
                 transform,
-                unit,
-                pending: true,
+                unit: unitForTransform[transform],
             }, {
                 startValue,
                 targetValue,
                 durationMs,
                 currentValue: startValue,
+                pending: true,
                 startTime: null,
                 endTime: null,
             },
@@ -156,15 +181,10 @@ export function startAnim(
         allTransforms: [anim],
         resolveOnFinish: null,
     };
-    if (!preExisiting || !preExisiting.pending) {
-        anim.pending = true;
-        elemAnims.pendingCount += 1;
-    }
+    elemAnims.pendingCount += pendingDiff;
+
     elemsWithTransforms.set(elem, elemAnims);
     elemsWithPending.set(elem, elemAnims);
-
-    // Immediately make sure that the element is where it's supposed to start.
-    elem.style.transform = getCurrentTransform(elemAnims);
 
     if (!animFrameRequestId) {
         animFrameRequestId = requestAnimationFrame(animationFrame);

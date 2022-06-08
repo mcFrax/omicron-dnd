@@ -1,4 +1,4 @@
-import { startAnim, animMs } from "./anims";
+import { setTransform, animMs } from "./anims";
 import { getItemsInContainerEndIndex } from "./dom-traversal";
 import { DragKind } from "./external-types";
 import { getOffsets } from "./offsets";
@@ -71,6 +71,6 @@ export function animateMoveInsideContainer(containerEl: HTMLElement, previousEve
         } else {
             newTranslation = 0;
         }
-        startAnim(otherEl, 'translateY', 'current', newTranslation, animMs);
+        setTransform(otherEl, 'translateY', 'current', newTranslation, animMs);
     }
 }
