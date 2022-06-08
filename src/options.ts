@@ -37,7 +37,7 @@ export class ContainerOptions {
     // similar as for draggableSelector.
     handleSelector: string|null = null;
     allowPull: DragKind|false = DragKind.Move;
-    allowDrop: Boolean = true;
+    allowDrop: boolean = true;
     // Minimal (euclidean, px) distance the pointer needs to move from the initial
     // position to trigger the drag before delay ends. Not applied for touch drag.
     minimalMoveMouse: number = 5
