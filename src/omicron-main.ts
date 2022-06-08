@@ -723,12 +723,16 @@ function exitDrag(execSort: boolean) {
     cancelInvisible(dragState.pickedEl);
 
     if (dragState.state == StateEnum.PendingDrag) {
-        let animElem = insertEl ?? dragState.pickedEl;
-        let destRect = animElem.getClientRects()[0];
-        const animTimeMs = 2 * animMs;
-        setTransform(animElem, 'translateX', dragState.floatElPos.x - destRect.left, 0, animTimeMs);
-        setTransform(animElem, 'translateY', dragState.floatElPos.y - destRect.top, 0, animTimeMs);
-        setTransform(animElem, 'scale', dragState.floatElScale, 1, animTimeMs);
+        if (execSort || dragState.dragKind === DragKind.Move) {
+            // Either animate inserted element to the new place, or animate
+            // pickedEl back to the place it was visually moved from.
+            let animElem = insertEl ?? dragState.pickedEl;
+            let destRect = animElem.getClientRects()[0];
+            const animTimeMs = 2 * animMs;
+            setTransform(animElem, 'translateX', dragState.floatElPos.x - destRect.left, 0, animTimeMs);
+            setTransform(animElem, 'translateY', dragState.floatElPos.y - destRect.top, 0, animTimeMs);
+            setTransform(animElem, 'scale', dragState.floatElScale, 1, animTimeMs);
+        }
 
         if (dragState.to) {
             removeBottomPaddingCorrection(dragState.to.containerEl);
