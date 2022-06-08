@@ -79,7 +79,9 @@ function getCurrentTransform(anims: ElementAnims): string {
 function elemAnimationFrame(timestamp: DOMHighResTimeStamp, elem: HTMLElement, anims: ElementAnims) {
     if (anims.pendingCount === 0) return; // Sanity check.
     for (let i = anims.allTransforms.length - 1; i >= 0; --i) {
-        paramAnimationFrame(timestamp, anims, anims.allTransforms[i], i);
+        if (anims.allTransforms[i].pending) {
+            paramAnimationFrame(timestamp, anims, anims.allTransforms[i], i);
+        }
     }
     elem.style.transform = getCurrentTransform(anims);
     if (anims.allTransforms.length === 0) {
