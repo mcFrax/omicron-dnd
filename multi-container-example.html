@@ -5,6 +5,105 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimal-ui" />
     <title>Omicron-dnd basic example</title>
     <style>
+      .visible-code {
+        display: block;
+        white-space: pre-wrap;
+        font-family: monospace;
+
+        font-size: 1.2rem;
+        margin: 4px;
+        border: 2px solid limegreen;
+        background-color: rgb(231, 231, 231);
+      }
+      .folded {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.4s;
+      }
+      .unfolded {
+        display: block;
+        overflow: auto;
+        max-height: 100vh;
+      }
+    </style>
+    <script>
+      document.addEventListener('change', (event) => {
+        if (event.target.classList.contains('snippet-fold-toggle')) {
+          event.target.parentElement.nextElementSibling.classList.toggle('unfolded');
+        }
+      });
+      function replaceThisWithExampleHTML() {
+        const codeContainer = document.currentScript.parentElement;
+        codeContainer.textContent =
+            document.currentScript.closest('.example-container').querySelector('.example').outerHTML;
+      }
+    </script>
+  </head>
+  <body>
+
+    <div class="example-container">
+      <h1>Basic example</h1>
+      <div class="example row" id="example1">
+        <ul>
+          <li>Drag items immediately with mouse 🖱️</li>
+          <li>Or tap and hold 👉⌛ when using touch</li>
+          <li>This way scroll on mobile still works 📱</li>
+          <li>It's that simple! 😃👍</li>
+        </ul>
+
+        <ul>
+          <li>You can drag elements between multiple containers</li>
+        </ul>
+
+        <ul>
+          <li>Omicron minimizes the DOM modification during drag</li>
+          <li>CSS transforms give us graphics acceleration ⚙️</li>
+          <li>And blazing performance 🔥🚀</li>
+        </ul>
+      </div>
+
+      <h2>Code</h2>
+
+      <label><input type="checkbox" class="snippet-fold-toggle" /> Show JS</label>
+      <script type="module" class="visible-code visible-js folded">
+        import OmicronDnd from './dist/omicron-dnd.js';
+
+        for (const ulElem of document.getElementById('example1').getElementsByTagName('ul')) {
+          OmicronDnd.init(ulElem);
+        }
+      </script>
+      <label><input type="checkbox" class="snippet-fold-toggle" /> Show CSS</label>
+      <style class="visible-code visible-css folded">
+        .drag-placeholder {
+          background:
+            repeating-linear-gradient(-45deg,
+              transparent 0 4px,
+              black 4px 8px);
+          opacity: 0.4;
+          border-radius: 8px;
+        }
+        .drag-float-item {
+          opacity: 0.8;
+          box-shadow:
+            0 2px 4px -2px rgba(0, 0, 0, 0.2),
+            0 4px 5px  0   rgba(0, 0, 0, 0.14),
+            0 1px 10px 0   rgba(0, 0, 0, 0.12);
+        }
+      </style>
+      <label><input type="checkbox" class="snippet-fold-toggle" /> Show HTML</label>
+      <div class="visible-code visible-html folded">
+        <script>
+          replaceThisWithExampleHTML();
+        </script>
+      </div>
+    </div>
+
+    <h2>Examples boilerplate</h2>
+    <p>
+      If you are missing some CSS responsible for the examples shape, you can check all details here.
+    </p>
+    <label><input type="checkbox" class="snippet-fold-toggle" /> Show base stylesheet</label>
+    <style class="visible-code visible-css folded">
       .row {
         display: flex;
         flex-direction: row;
@@ -29,59 +128,6 @@
         cursor: pointer;
       }
 
-      .visible-stylesheet {
-        display: block;
-        white-space: pre-wrap;
-        font-family: monospace;
-
-        font-size: 1.2rem;
-        margin: 4px;
-        border: 2px solid limegreen;
-        background-color: rgb(231, 231, 231);
-      }
-    </style>
-  </head>
-  <body>
-    <div class="row">
-      <ul>
-        <li>Drag items immediately with mouse 🖱️</li>
-        <li>Or tap and hold 👉⌛ when using touch</li>
-        <li>This way scroll on mobile still works 📱</li>
-        <li>It's that simple! 😃👍</li>
-      </ul>
-
-      <ul>
-        <li>You can drag elements between multiple containers</li>
-      </ul>
-
-      <ul>
-        <li>Omicron minimizes the DOM modification during drag</li>
-        <li>CSS transforms give us graphics acceleration ⚙️</li>
-        <li>And blazing performance 🔥🚀</li>
-      </ul>
-    </div>
-    <style class="visible-stylesheet">
-      .drag-placeholder {
-        background:
-          repeating-linear-gradient(-45deg,
-            transparent 0 4px,
-            black 4px 8px);
-        opacity: 0.4;
-        border-radius: 8px;
-      }
-      .drag-float-item {
-        opacity: 0.8;
-        box-shadow:
-          0 2px 4px -2px rgba(0, 0, 0, 0.2),
-          0 4px 5px  0   rgba(0, 0, 0, 0.14),
-          0 1px 10px 0   rgba(0, 0, 0, 0.12);
-      }
     </style>
   </body>
-  <script type="module">
-    import OmicronDnd from './dist/omicron-dnd.js';
-    for (const ulElem of document.getElementsByTagName('ul')) {
-      OmicronDnd.init(ulElem);
-    }
-  </script>
 </html>
