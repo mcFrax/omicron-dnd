@@ -1,3 +1,4 @@
+import { getComputedStyleOr0, KnownLengthProperty } from "./style-basics";
 
 export const animMs = 100;
 
@@ -5,21 +6,58 @@ export const animMs = 100;
 // requested.
 let animFrameRequestId = 0; // 0 is never used as actual id.
 
-type TransformName = 'translateX' | 'translateY' | 'scale' | 'rotate';
+type TransformName =
+    'translateX' | 'translateY' |
+    'scale' | 'scaleX' | 'scaleY' |
+    'rotate';
 type TransformUnit = '' | 'px' | 'deg';
 const unitForTransform: Record<TransformName, TransformUnit> = {
     translateX: 'px',
     translateY: 'px',
     scale: '',
+    scaleX: '',
+    scaleY: '',
     rotate: 'deg',
 };
 const defaultForTransform: Record<TransformName, number> = {
     translateX: 0,
     translateY: 0,
     scale: 1,
+    scaleX: 1,
+    scaleY: 1,
     rotate: 0,
 };
 
+const unitForProp: typeof unitForTransform & Record<KnownLengthProperty, 'px'> = {
+    ...unitForTransform,
+    marginBottom: 'px',
+    marginTop: 'px',
+    marginLeft: 'px',
+    marginRight: 'px',
+    paddingBottom: 'px',
+    paddingTop: 'px',
+    paddingLeft: 'px',
+    paddingRight: 'px',
+    height: 'px',
+    width: 'px',
+    maxHeight: 'px',
+    maxWidth: 'px',
+    rowGap: 'px',
+    columnGap: 'px',
+};
+
+type TransformOrProperty = TransformName | KnownLengthProperty;
+
+export function AssertThatTransformNameAndKnownLengthPropertyAreDisjoint(
+    t: TransformName,
+    p: KnownLengthProperty,
+): [Exclude<TransformName, KnownLengthProperty>, Exclude<KnownLengthProperty, TransformName>] {
+    return [t, p];
+}
+
+function isTransform(prop: TransformOrProperty): prop is TransformName {
+    return prop in unitForTransform;
+}
 
 type MaybeAnimTimespan = {
     startTime: DOMHighResTimeStamp
@@ -31,11 +69,12 @@ type MaybeAnimTimespan = {
 
 type SingleParamAnim = {
     elem: HTMLElement,
-    transform: TransformName,
+    prop: TransformOrProperty,
     unit: TransformUnit,
     startValue: number
     currentValue: number
     targetValue: number
+    clearValue: number
     durationMs: number
     pending: boolean
 } & MaybeAnimTimespan;
@@ -51,9 +90,9 @@ type ElementAnims = {
 let elemsWithPending: Map<HTMLElement, ElementAnims> = new Map();
 let elemsWithTransforms: Map<HTMLElement, ElementAnims> = new Map();
 
-function getAnim(elem: HTMLElement, transform: TransformName): SingleParamAnim | undefined {
+function getAnim(elem: HTMLElement, prop: TransformOrProperty): SingleParamAnim | undefined {
     const elemAnims = elemsWithTransforms.get(elem);
-    return elemAnims?.allTransforms.find((anim) => anim.transform === transform);
+    return elemAnims?.allTransforms.find((anim) => anim.prop === prop);
 }
 
 function animationFrame(timestamp: DOMHighResTimeStamp) {
@@ -70,20 +109,15 @@ function animationFrame(timestamp: DOMHighResTimeStamp) {
     }
 }
 
-function getCurrentTransform(anims: ElementAnims): string {
-    return anims.allTransforms.map(
-        (anim) => `${anim.transform}(${anim.currentValue}${anim.unit})`
-    ).join(' ');
-}
-
 function elemAnimationFrame(timestamp: DOMHighResTimeStamp, elem: HTMLElement, anims: ElementAnims) {
     if (anims.pendingCount === 0) return; // Sanity check.
+    const transforms: string[] = [];
     for (let i = anims.allTransforms.length - 1; i >= 0; --i) {
         if (anims.allTransforms[i].pending) {
-            paramAnimationFrame(timestamp, anims, anims.allTransforms[i], i);
+            paramAnimationFrame(timestamp, anims, anims.allTransforms[i], i, transforms);
         }
     }
-    elem.style.transform = getCurrentTransform(anims);
+    elem.style.transform = transforms.join(' ');
     if (anims.allTransforms.length === 0) {
         // Everything zeroed and it's no longer necessary to keep the record.
         elemsWithPending.delete(elem);
@@ -99,20 +133,33 @@ function paramAnimationFrame(
     anims: ElementAnims,
     anim: SingleParamAnim,
     animIdx: number,
+    transforms: string[],
+) {
+    updateCurrentValueOnFrame(timestamp, anim, anims, animIdx);
+
+    applyCurrentValue(anim, transforms);
+}
+
+function updateCurrentValueOnFrame(
+    timestamp: DOMHighResTimeStamp,
+    anim: SingleParamAnim,
+    anims: ElementAnims,
+    animIdx: number,
 ) {
     if (!anim.startTime) {
         anim.startTime = timestamp;
         anim.endTime = timestamp + anim.durationMs;
-        return;  // Do nothing with currentValue.
+        return;
     }
     const advancementRate =
         timestamp >= anim.endTime ? 1 : (timestamp - anim.startTime) / anim.durationMs;
     anim.currentValue =
         advancementRate * anim.targetValue + (1 - advancementRate) * anim.startValue;
+
     if (advancementRate >= 1) {
         anims.pendingCount -= 1;
         anim.pending = false;
-        if (anim.currentValue === defaultForTransform[anim.transform]) {
+        if (anim.currentValue === anim.clearValue) {
             // Remove the transform.
             anims.allTransforms[animIdx] = anims.allTransforms[anims.allTransforms.length - 1];
             anims.allTransforms.pop();
@@ -120,16 +167,49 @@ function paramAnimationFrame(
     }
 }
 
+function applyCurrentValue(
+    anim: SingleParamAnim,
+    transforms: string[],
+) {
+    if (isTransform(anim.prop)) {
+        if (anim.currentValue !== anim.clearValue) {
+            transforms.push(`${anim.prop}(${anim.currentValue}${anim.unit})`);
+        }
+    } else if (anim.pending || anim.currentValue !== anim.clearValue) {
+        anim.elem.style[anim.prop] = `${anim.currentValue}${anim.unit}`;
+    } else {
+        anim.elem.style[anim.prop] = '';
+    }
+}
+
+function getClearValue(elem: HTMLElement, prop: TransformOrProperty) {
+    if (isTransform(prop)) {
+        return defaultForTransform[prop];
+    }
+    if (elem.style[prop] === '') {
+        return getComputedStyleOr0(elem, prop);
+    }
+    // The value is set on the element, and we should never unset it.
+    return NaN;
+}
+
+function getInitialValue(elem: HTMLElement, prop: TransformOrProperty) {
+    if (isTransform(prop)) {
+        return defaultForTransform[prop];
+    }
+    return getComputedStyleOr0(elem, prop);
+}
+
 export function setTransform(
     elem: HTMLElement,
-    transform: TransformName,
+    prop: TransformOrProperty,
     startValueOrFn: 'current'|number|((previous: number) => number),
     targetValueOrFn?: undefined,
     durationMs?: undefined,
 ): void;
 export function setTransform(
     elem: HTMLElement,
-    transform: TransformName,
+    prop: TransformOrProperty,
     startValueOrFn: 'current'|number|((previous: number) => number),
     targetValueOrFn?: number|((startValue: number, previous: number) => number)|undefined,
     durationMs?: number,
@@ -137,14 +217,15 @@ export function setTransform(
 
 export function setTransform(
     elem: HTMLElement,
-    transform: TransformName,
+    prop: TransformOrProperty,
     startValueOrFn: 'current'|number|((previous: number) => number),
     targetValueOrFn: number|((startValue: number, previous: number) => number)|undefined,
     durationMs: number = animMs,
 ) {
     const preExistingElemAnims = elemsWithTransforms.get(elem);
-    const preExisiting = getAnim(elem, transform);
-    const previousValue = preExisiting?.currentValue ?? defaultForTransform[transform];
+    const preExisiting = getAnim(elem, prop);
+    const clearValue = preExisiting?.clearValue ?? getClearValue(elem, prop);
+    const previousValue = preExisiting?.currentValue ?? getInitialValue(elem, prop);
     const startValue =
         (startValueOrFn ===  'current') ? previousValue :
             (typeof startValueOrFn === 'function') ?
@@ -163,8 +244,9 @@ export function setTransform(
         Object.assign(
             preExisiting ?? {
                 elem,
-                transform,
-                unit: unitForTransform[transform],
+                prop,
+                unit: unitForProp[prop],
+                clearValue,
             }, {
                 startValue,
                 targetValue,

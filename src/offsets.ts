@@ -2,18 +2,8 @@ import { InsertionPlaceCandidate } from "./base-types";
 import { findNextStaticSibling, findPreviousStaticSibling, getItemsInContainerEndIndex, getItemsInContainerStartIndex } from "./dom-traversal";
 import { DragKind } from "./external-types";
 import { BadStateError, DragState, dragState, StateEnum } from "./state";
+import { getComputedStyleOr0 } from "./style-basics";
 
-
-type KnownLengthProperty =
-    'marginBottom' | 'marginTop' | 'marginLeft' | 'marginRight' |
-    'paddingBottom' | 'paddingTop' | 'paddingLeft' | 'paddingRight' |
-    'height' | 'width' | 'maxHeight' | 'maxWidth' |
-    'rowGap' | 'columnGap';
-
-export function getComputedStyleOr0(elem: Element | undefined | null, prop: KnownLengthProperty): number {
-  if (!elem) return 0;
-  return parseFloat(getComputedStyle(elem)[prop]);
-}
 
 export function getEffectiveClientHeight(elem: Element): number {
   return elem.getClientRects()[0]?.height || 0;
