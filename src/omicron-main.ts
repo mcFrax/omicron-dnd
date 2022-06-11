@@ -905,16 +905,18 @@ function updateBottomPaddingCorrection() {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     if (!dragState.to) return;
     const toEl = dragState.to.containerEl;
-    if (toEl && toEl !== dragState.from.containerEl && !toEl.style.paddingBottom) {
-        toEl.style.paddingBottom =
-            getComputedStyleOr0(toEl, 'paddingBottom') + dragState.to.gapToPlaceholderOffset + 'px';
+    if (toEl && toEl !== dragState.from.containerEl) {
+        const gapToPlaceholderOffset = dragState.to.gapToPlaceholderOffset;
+        setTransform(toEl, 'paddingBottom', 'current', (_current, base) => {
+            return base + gapToPlaceholderOffset;
+        });
     }
 }
 
 function removeBottomPaddingCorrection(toEl: ContainerEl) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     if (toEl !== dragState.from.containerEl) {
-        toEl.style.paddingBottom = '';
+        setTransform(toEl, 'paddingBottom', 'current', 'base');
     }
 }
 
