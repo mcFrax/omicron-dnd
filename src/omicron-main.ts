@@ -319,6 +319,7 @@ function startDrag() {
                 startEvPoint,
                 true,
                 dragState.from.index,
+                dragState.dragKind === DragKind.Move,
             )
     ) {
         // Synthethic update, to determine the insertion point.
@@ -834,7 +835,13 @@ function anyState_container_PointerLeave(event: TypedActiveEvent<PointerEvent, C
     }, 0);
 }
 
-function maybeEnterContainer(containerData: ContainerData, evPlace: EvPlace, ignoreGuards?: boolean, forceInsertionIndex?: number) {
+function maybeEnterContainer(
+    containerData: ContainerData,
+    evPlace: EvPlace,
+    ignoreGuards?: boolean,
+    forceInsertionIndex?: number,
+    animatePlaceholderFromPickedItem?: boolean,
+) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     let cData = containerData;
     let rect = cData.el.getClientRects()[0];
@@ -848,14 +855,19 @@ function maybeEnterContainer(containerData: ContainerData, evPlace: EvPlace, ign
         const insertionIndex = forceInsertionIndex ?? findUpdatedInsertionIndex(cData.el, evPlace);
         const eventualIndex = eventualIndexFromInsertionIndex(cData.el, insertionIndex);
         if (!dragState.forbiddenIndices.isForbiddenIndex(cData.el, dragState.pickedEl, insertionIndex)) {
-            enterContainer(cData.el, insertionIndex, eventualIndex);
+            enterContainer(cData.el, insertionIndex, eventualIndex, animatePlaceholderFromPickedItem);
             return true;
         }
     }
     return false;
 }
 
-function enterContainer(toEl: ContainerEl, insertionIndex: number, eventualIndex: number) {
+function enterContainer(
+    toEl: ContainerEl,
+    insertionIndex: number,
+    eventualIndex: number,
+    animatePlaceholderFromPickedItem?: boolean,
+) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     if (dragState.to) {
         // Handle removal from the previous container.
@@ -876,7 +888,7 @@ function enterContainer(toEl: ContainerEl, insertionIndex: number, eventualIndex
 
     updatePlaceholderAndNoMoveZone(dragState.to);
     updateBottomPaddingCorrection();
-    showPlaceholder(dragState.to.placeholderEl);
+    showPlaceholder(dragState.to.placeholderEl, animatePlaceholderFromPickedItem);
 
     animateMoveInsideContainer(toEl, getItemsInContainerEndIndex(toEl), eventualIndex);
 

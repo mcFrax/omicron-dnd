@@ -1,5 +1,6 @@
 import { setTransform } from "./anims";
 import { ContainerEl } from "./expando";
+import { getHeightWithPadding } from "./offsets";
 import { BadStateError, dragState, StateEnum } from "./state";
 
 const placeholders = new Map<HTMLElement, HTMLElement>();
@@ -13,9 +14,15 @@ export function getOrCreatePlaceholder(toEl: ContainerEl) {
     return placeholder;
 }
 
-export function showPlaceholder(placeholderEl: HTMLElement) {
+export function showPlaceholder(
+    placeholderEl: HTMLElement,
+    animatePlaceholderFromPickedItem?: boolean,
+) {
     // TODO: Use container's animation time.
-    setTransform(placeholderEl, 'scaleY', 0, 'base');
+    const scaleStart =
+        (animatePlaceholderFromPickedItem && dragState) ?
+            getHeightWithPadding(dragState.pickedEl) / getHeightWithPadding(placeholderEl) || 0 : 0;
+    setTransform(placeholderEl, 'scaleY', scaleStart, 'base');
     setTransform(placeholderEl, 'opacity', 'current', 'base');
 }
 
