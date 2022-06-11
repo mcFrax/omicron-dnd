@@ -744,7 +744,8 @@ function exitDrag(execSort: boolean) {
         }
 
         if (dragState.to) {
-            removeBottomPaddingCorrection(dragState.to.containerEl);
+            // TODO: Handle better with AfterDrag state.
+            removeBottomPaddingCorrection(dragState.to.containerEl, true);
 
             // Invoke onContainerLeft here to be consistent with how it's called
             // in leaveContainer - after the container cleanup.
@@ -935,13 +936,15 @@ function updateBottomPaddingCorrection() {
     }
 }
 
-function removeBottomPaddingCorrection(toEl: ContainerEl) {
+function removeBottomPaddingCorrection(toEl: ContainerEl, immediately?: boolean) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     if (toEl !== dragState.from.containerEl) {
-        const animTimeMs =
-            toEl[expando].options.animatePadding ?
-                toEl[expando].options.animationTimeMs : 0;
-        setTransform(toEl, 'paddingBottom', 'current', 'base', animTimeMs);
+        if (immediately || !toEl[expando].options.animatePadding) {
+            setTransform(toEl, 'paddingBottom', 'base');
+        } else {
+            const animTimeMs = toEl[expando].options.animationTimeMs;
+            setTransform(toEl, 'paddingBottom', 'current', 'base', animTimeMs);
+        }
     }
 }
 
