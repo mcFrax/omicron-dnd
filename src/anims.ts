@@ -200,8 +200,8 @@ function getInitialValue(elem: HTMLElement, prop: TransformOrProperty) {
     return getComputedStyleOr0(elem, prop);
 }
 
-type StartValueOrFn = 'current'|'base'|number|((previous: number) => number);
-type TargetValueOrFn = 'current'|'base'|number|((startValue: number, previous: number) => number);
+type StartValueOrFn = 'current'|'base'|number|((previous: number, base: number) => number);
+type TargetValueOrFn = 'current'|'base'|number|((startValue: number, previous: number, base: number) => number);
 
 export function setTransform(
     elem: HTMLElement,
@@ -233,13 +233,13 @@ export function setTransform(
         (startValueOrFn ===  'current') ? previousValue :
             (startValueOrFn ===  'base') ? clearValue :
                 (typeof startValueOrFn === 'function') ?
-                    startValueOrFn(previousValue) : startValueOrFn;
+                    startValueOrFn(previousValue, clearValue) : startValueOrFn;
 
     const targetValue = targetValueOrFn === undefined ? startValue :
         (targetValueOrFn ===  'current') ? previousValue :
             (targetValueOrFn ===  'base') ? clearValue :
                 (typeof targetValueOrFn === 'function') ?
-                    targetValueOrFn(startValue, previousValue) : targetValueOrFn;
+                    targetValueOrFn(startValue, previousValue, clearValue) : targetValueOrFn;
 
     if (targetValue === startValue) {
         durationMs = 0;
