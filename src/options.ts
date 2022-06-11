@@ -63,6 +63,18 @@ export class ContainerOptions {
     enterGuardLeftPx: number = 0;
     enterGuardRight: number = 0;
     enterGuardRightPx: number = 0;
+    // Time to animate a move.
+    // Set to 0 to disable animation.
+    animationTimeMs: number = 100;
+    // Time to animate element falling into place after being dropped.
+    // This animation is more about showing the move and is not interactive,
+    // so it can be made slower.
+    // Set to 0 to disable animation.
+    floatToPlaceAnimationTimeMs: number = 200;
+    // Whether padding change of the container should be animated. Animating
+    // padding (as opposed to simple transforms) may be quite costly, which
+    // is why this feature can be separately disabled.
+    animatePadding: boolean = true;
     // If true, the dragged element will hover over the place where it was
     // dragged from on the drag start, regardless of pointer position, but only
     // if this is a legal drop spot.

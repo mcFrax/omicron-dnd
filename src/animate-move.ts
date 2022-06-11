@@ -1,11 +1,12 @@
-import { setTransform, animMs } from "./anims";
+import { setTransform } from "./anims";
 import { getItemsInContainerEndIndex } from "./dom-traversal";
+import { ContainerEl, expando } from "./expando";
 import { DragKind } from "./external-types";
 import { getOffsets } from "./offsets";
-import { dragState, StateEnum } from "./state";
+import { dragState } from "./state";
 
 
-export function animateMoveInsideContainer(containerEl: HTMLElement, previousEventualIndex: number, newEventualIndex: number) {
+export function animateMoveInsideContainer(containerEl: ContainerEl, previousEventualIndex: number, newEventualIndex: number) {
     // There are 4 groups of elements, adjusted by different offsets:
     //
     // 1. no offset
@@ -36,15 +37,17 @@ export function animateMoveInsideContainer(containerEl: HTMLElement, previousEve
         gapToPlaceholderOffset,
     } = getOffsets(dragState);
 
-    let maxItemIndex = getItemsInContainerEndIndex(containerEl) - 1;
-    let affectedStart =
+    const maxItemIndex = getItemsInContainerEndIndex(containerEl) - 1;
+    const affectedStart =
         Math.min(maxItemIndex, Math.min(newEventualIndex, previousEventualIndex));
-    let affectedEnd =
+    const affectedEnd =
         Math.min(maxItemIndex, Math.max(newEventualIndex, previousEventualIndex));
 
     if (maxItemIndex === -1) {
-    return; // Empty container, nothing to animate.
+        return; // Empty container, nothing to animate.
     }
+
+    const animTimeMs = containerEl[expando].options.animationTimeMs;
 
     // Note: we are using actual oldIndex below, not previousIndex.
     // This is because we have to deal with activeEl affecting offsets,
@@ -71,6 +74,6 @@ export function animateMoveInsideContainer(containerEl: HTMLElement, previousEve
         } else {
             newTranslation = 0;
         }
-        setTransform(otherEl, 'translateY', 'current', newTranslation, animMs);
+        setTransform(otherEl, 'translateY', 'current', newTranslation, animTimeMs);
     }
 }

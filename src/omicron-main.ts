@@ -1,6 +1,6 @@
 
 import { animateMoveInsideContainer } from "./animate-move";
-import { setTransform, animMs } from "./anims";
+import { setTransform } from "./anims";
 import { EvPlace, InsertionPlaceCandidate } from "./base-types";
 import { preventImmediateClick } from "./click-blocker";
 import { getItemFromContainerEvent, getItemsInContainerEndIndex, getItemsInContainerStartIndex, hasContainerAncestor, isOrderable } from "./dom-traversal";
@@ -670,9 +670,10 @@ function exitDrag(execSort: boolean) {
             // We assume that they're offset position was changed by
             // pickedElToGapOffset, so we immediately subtract that from
             // their translation.
+            const animTimeMs = fromEl[expando].options.animationTimeMs;
             for (let elem of Array.from(fromEl.children).slice(fromIndex)) {
                 if (elem instanceof HTMLElement) {
-                    setTransform(elem, 'translateY', immediateTranslation, 0, animMs);
+                    setTransform(elem, 'translateY', immediateTranslation, 0, animTimeMs);
                 }
             }
         }
@@ -696,9 +697,10 @@ function exitDrag(execSort: boolean) {
                     getGapBetweenSiblingsAfterItemRemoval(insertEl);
         const immediateTranslation2 = (currentY: number) => currentY + pickedElToGapOffset2;
         // Adjust elements after inserted and animate them to 0.
+        const animTimeMs = toEl[expando].options.animationTimeMs;
         for (let elem of Array.from(toEl.children).slice(eventualIndex + 1)) {
             if (elem instanceof HTMLElement) {
-                setTransform(elem, 'translateY', immediateTranslation2, 0, animMs);
+                setTransform(elem, 'translateY', immediateTranslation2, 0, animTimeMs);
             }
         }
     } else {
@@ -713,9 +715,10 @@ function exitDrag(execSort: boolean) {
         // When cancelling, let's simply tell everyone to go home.
         for (let cont of [dragState.from.containerEl, dragState.to?.containerEl]) {
             if (!cont) continue;  // toEl may be missing.
+            const animTimeMs = cont[expando].options.animationTimeMs;
             for (const elem of cont.children) {
                 if (elem instanceof HTMLElement) {
-                    setTransform(elem, 'translateY', 'current', 0, animMs);
+                    setTransform(elem, 'translateY', 'current', 0, animTimeMs);
                 }
             }
         }
@@ -729,7 +732,8 @@ function exitDrag(execSort: boolean) {
             // pickedEl back to the place it was visually moved from.
             let animElem = insertEl ?? dragState.pickedEl;
             let destRect = animElem.getClientRects()[0];
-            const animTimeMs = 2 * animMs;
+            const containerEl = dragState.to?.containerEl ?? dragState.from.containerEl;
+            const animTimeMs = containerEl[expando].options.floatToPlaceAnimationTimeMs;
             setTransform(animElem, 'translateX', dragState.floatElPos.x - destRect.left, 0, animTimeMs);
             setTransform(animElem, 'translateY', dragState.floatElPos.y - destRect.top, 0, animTimeMs);
             setTransform(animElem, 'scale', dragState.floatElScale, 1, animTimeMs);
@@ -907,16 +911,22 @@ function updateBottomPaddingCorrection() {
     const toEl = dragState.to.containerEl;
     if (toEl && toEl !== dragState.from.containerEl) {
         const gapToPlaceholderOffset = dragState.to.gapToPlaceholderOffset;
+        const animTimeMs =
+            toEl[expando].options.animatePadding ?
+                toEl[expando].options.animationTimeMs : 0;
         setTransform(toEl, 'paddingBottom', 'current', (_current, base) => {
             return base + gapToPlaceholderOffset;
-        });
+        }, animTimeMs);
     }
 }
 
 function removeBottomPaddingCorrection(toEl: ContainerEl) {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
     if (toEl !== dragState.from.containerEl) {
-        setTransform(toEl, 'paddingBottom', 'current', 'base');
+        const animTimeMs =
+            toEl[expando].options.animatePadding ?
+                toEl[expando].options.animationTimeMs : 0;
+        setTransform(toEl, 'paddingBottom', 'current', 'base', animTimeMs);
     }
 }
 
