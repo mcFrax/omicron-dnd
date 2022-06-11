@@ -2,11 +2,16 @@ import { InsertionPlaceCandidate } from "./base-types";
 import { findNextStaticSibling, findPreviousStaticSibling, getItemsInContainerEndIndex, getItemsInContainerStartIndex } from "./dom-traversal";
 import { DragKind } from "./external-types";
 import { BadStateError, DragState, dragState, StateEnum } from "./state";
-import { getComputedStyleOr0 } from "./style-basics";
+import { getComputedStyleOr0, KnownLengthProperty } from "./style-basics";
 
+const contentSizeHeightIngredients: KnownLengthProperty[] =
+    ['height', 'paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'];
 
-export function getEffectiveClientHeight(elem: Element): number {
-  return elem.getClientRects()[0]?.height || 0;
+export function getHeightWithPadding(elem: Element): number {
+  if (getComputedStyle(elem).boxSizing === 'border-box') {
+    return getComputedStyleOr0(elem, 'height');
+  }
+  return contentSizeHeightIngredients.reduce((acc, prop) => acc + getComputedStyleOr0(elem, prop), 0);
 }
 
 export function getEffectiveMarginBetweenSiblings(
@@ -39,7 +44,7 @@ export function getEffectiveBottomSiblingMargin(item: Element): number {
 
 export function getItemToNothingOffset(item: HTMLElement): number {
     return -(
-        getEffectiveClientHeight(item) +
+        getHeightWithPadding(item) +
         getEffectiveTopSiblingMargin(item) +
         getEffectiveBottomSiblingMargin(item));
 }
@@ -83,7 +88,7 @@ export function getGapToPlaceholderOffset(to: InsertionPlaceCandidate): number {
   const effectiveTopGap = getEffectiveMarginBetweenSiblings(topSibling, to.placeholderEl);
   const effectiveBottomGap = getEffectiveMarginBetweenSiblings(to.placeholderEl, bottomSibling);
 
-  return getEffectiveClientHeight(to.placeholderEl) + effectiveTopGap + effectiveBottomGap - gap;
+  return getHeightWithPadding(to.placeholderEl) + effectiveTopGap + effectiveBottomGap - gap;
 }
 
 export function getOffsets(dragState: DragState) {

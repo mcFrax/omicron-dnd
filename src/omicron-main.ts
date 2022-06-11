@@ -526,7 +526,10 @@ function findUpdatedInsertionIndex(containerEl: ContainerEl, evtPoint: EvPlace):
 function updatePlaceholderAndNoMoveZone(to: InsertionPlaceCandidate): void {
     let newPlaceholderTop = findPlaceholderTop(to);
     to.gapToPlaceholderOffset = getGapToPlaceholderOffset(to);
-    to.placeholderEl.style.transform = `translateY(${newPlaceholderTop}px)`;
+
+    setTransform(to.placeholderEl, 'translateY', newPlaceholderTop);
+    setTransform(to.placeholderEl, 'scaleY', 0, 'base');
+    setTransform(to.placeholderEl, 'opacity', 0, 'base');
 }
 
 function findPlaceholderTop({

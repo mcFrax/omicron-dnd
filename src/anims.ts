@@ -1,4 +1,4 @@
-import { getComputedStyleOr0, KnownLengthProperty } from "./style-basics";
+import { getComputedStyleOr0, KnownNumberProperty } from "./style-basics";
 
 export const animMs = 100;
 
@@ -10,8 +10,8 @@ type TransformName =
     'translateX' | 'translateY' |
     'scale' | 'scaleX' | 'scaleY' |
     'rotate';
-type TransformUnit = '' | 'px' | 'deg';
-const unitForTransform: Record<TransformName, TransformUnit> = {
+type CssUnit = '' | 'px' | 'deg';
+const unitForTransform: Record<TransformName, CssUnit> = {
     translateX: 'px',
     translateY: 'px',
     scale: '',
@@ -28,7 +28,7 @@ const defaultForTransform: Record<TransformName, number> = {
     rotate: 0,
 };
 
-const unitForProp: typeof unitForTransform & Record<KnownLengthProperty, 'px'> = {
+const unitForProp: typeof unitForTransform & Record<KnownNumberProperty, CssUnit> = {
     ...unitForTransform,
     marginBottom: 'px',
     marginTop: 'px',
@@ -38,20 +38,25 @@ const unitForProp: typeof unitForTransform & Record<KnownLengthProperty, 'px'> =
     paddingTop: 'px',
     paddingLeft: 'px',
     paddingRight: 'px',
+    borderBottomWidth: 'px',
+    borderTopWidth: 'px',
+    borderLeftWidth: 'px',
+    borderRightWidth: 'px',
     height: 'px',
     width: 'px',
     maxHeight: 'px',
     maxWidth: 'px',
     rowGap: 'px',
     columnGap: 'px',
+    opacity: '',
 };
 
-type TransformOrProperty = TransformName | KnownLengthProperty;
+type TransformOrProperty = TransformName | KnownNumberProperty;
 
-export function AssertThatTransformNameAndKnownLengthPropertyAreDisjoint(
+export function AssertThatTransformNameAndNumberPropertyAreDisjoint(
     t: TransformName,
-    p: KnownLengthProperty,
-): [Exclude<TransformName, KnownLengthProperty>, Exclude<KnownLengthProperty, TransformName>] {
+    p: KnownNumberProperty,
+): [Exclude<TransformName, KnownNumberProperty>, Exclude<KnownNumberProperty, TransformName>] {
     return [t, p];
 }
 
@@ -70,7 +75,7 @@ type MaybeAnimTimespan = {
 type SingleParamAnim = {
     elem: HTMLElement,
     prop: TransformOrProperty,
-    unit: TransformUnit,
+    unit: CssUnit,
     startValue: number
     currentValue: number
     targetValue: number
@@ -113,9 +118,7 @@ function elemAnimationFrame(timestamp: DOMHighResTimeStamp, elem: HTMLElement, a
     if (anims.pendingCount === 0) return; // Sanity check.
     const transforms: string[] = [];
     for (let i = anims.allTransforms.length - 1; i >= 0; --i) {
-        if (anims.allTransforms[i].pending) {
-            paramAnimationFrame(timestamp, anims, anims.allTransforms[i], i, transforms);
-        }
+        paramAnimationFrame(timestamp, anims, anims.allTransforms[i], i, transforms);
     }
     elem.style.transform = transforms.join(' ');
     if (anims.allTransforms.length === 0) {
@@ -135,7 +138,9 @@ function paramAnimationFrame(
     animIdx: number,
     transforms: string[],
 ) {
-    updateCurrentValueOnFrame(timestamp, anim, anims, animIdx);
+    if (anim.pending) {
+        updateCurrentValueOnFrame(timestamp, anim, anims, animIdx);
+    }
 
     applyCurrentValue(anim, transforms);
 }
@@ -160,9 +165,9 @@ function updateCurrentValueOnFrame(
         anims.pendingCount -= 1;
         anim.pending = false;
         if (anim.currentValue === anim.clearValue) {
-            // Remove the transform.
-            anims.allTransforms[animIdx] = anims.allTransforms[anims.allTransforms.length - 1];
-            anims.allTransforms.pop();
+            // Remove the transform. We need to keep order due to
+            // translate/scale ordering issue.
+            anims.allTransforms.splice(animIdx, 1);
         }
     }
 }
@@ -265,7 +270,14 @@ export function setTransform(
             },
         );
     if (preExistingElemAnims && !preExisiting) {
-        preExistingElemAnims.allTransforms.push(anim);
+        if (prop === 'translateX' || prop === 'translateY') {
+            // Order matters between transitions. We need to keep the
+            // translations after scaling and rotations to keep the
+            // semantics consistent.
+            preExistingElemAnims.allTransforms.push(anim);
+        } else {
+            preExistingElemAnims.allTransforms.unshift(anim);
+        }
     }
     const elemAnims = preExistingElemAnims ?? {
         pendingCount: 0,

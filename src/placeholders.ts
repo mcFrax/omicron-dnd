@@ -1,3 +1,4 @@
+import { setTransform } from "./anims";
 import { ContainerEl } from "./expando";
 import { BadStateError, dragState, StateEnum } from "./state";
 
@@ -13,13 +14,15 @@ export function getOrCreatePlaceholder(toEl: ContainerEl) {
 }
 
 export function showPlaceholder(placeholderEl: HTMLElement) {
-    placeholderEl.style.visibility = '';
-    placeholderEl.style.opacity = '';
+    // TODO: Use container's animation time.
+    setTransform(placeholderEl, 'scaleY', 0, 'base');
+    setTransform(placeholderEl, 'opacity', 'current', 'base');
 }
 
 export function hidePlaceholder(placeholderEl: HTMLElement) {
-    placeholderEl.style.visibility = 'hidden';
-    placeholderEl.style.opacity = '0';
+    // TODO: Use container's animation time.
+    setTransform(placeholderEl, 'scaleY', 'current', 0);
+    setTransform(placeholderEl, 'opacity', 'current', 0);
 }
 
 export function clearPlaceholders() {
@@ -37,10 +40,12 @@ function createPlaceholder(toEl: ContainerEl) {
     placeholderEl.style.zIndex = '1';
     placeholderEl.style.userSelect = 'none';
     placeholderEl.style.pointerEvents = 'none';
-    placeholderEl.style.visibility = 'hidden';
-    placeholderEl.style.opacity = '0';
+    placeholderEl.style.transformOrigin = 'top center';
     placeholderEl.classList.add('drag-placeholder');
     toEl.appendChild(placeholderEl);
+    // Use set transform after appendChild, so that it captures the base opacity
+    // correctly.
+    setTransform(placeholderEl, 'opacity', 0);
     // Set background only if not set externally.
     if (getComputedStyle(placeholderEl).backgroundColor !== 'rgba(0, 0, 0, 0)') {
         placeholderEl.style.background = 'lightgray';
