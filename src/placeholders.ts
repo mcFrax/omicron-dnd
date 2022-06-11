@@ -23,7 +23,7 @@ export function showPlaceholder(
         (animatePlaceholderFromPickedItem && dragState) ?
             getHeightWithPadding(dragState.pickedEl) / getHeightWithPadding(placeholderEl) || 0 : 0;
     setTransform(placeholderEl, 'scaleY', scaleStart, 'base');
-    setTransform(placeholderEl, 'opacity', 'current', 'base');
+    setTransform(placeholderEl, 'opacity', 0, 'base');
 }
 
 export function hidePlaceholder(placeholderEl: HTMLElement) {
