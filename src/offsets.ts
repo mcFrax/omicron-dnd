@@ -4,14 +4,14 @@ import { DragKind } from "./external-types";
 import { BadStateError, DragState, dragState, StateEnum } from "./state";
 import { getComputedStyleOr0, KnownLengthProperty } from "./style-basics";
 
-const contentSizeHeightIngredients: KnownLengthProperty[] =
+const borderHeightIngredients: KnownLengthProperty[] =
     ['height', 'paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'];
 
-export function getHeightWithPadding(elem: Element): number {
+export function getBorderSizeHeight(elem: Element): number {
   if (getComputedStyle(elem).boxSizing === 'border-box') {
     return getComputedStyleOr0(elem, 'height');
   }
-  return contentSizeHeightIngredients.reduce((acc, prop) => acc + getComputedStyleOr0(elem, prop), 0);
+  return borderHeightIngredients.reduce((acc, prop) => acc + getComputedStyleOr0(elem, prop), 0);
 }
 
 export function getEffectiveMarginBetweenSiblings(
@@ -44,7 +44,7 @@ export function getEffectiveBottomSiblingMargin(item: Element): number {
 
 export function getItemToNothingOffset(item: HTMLElement): number {
     return -(
-        getHeightWithPadding(item) +
+        getBorderSizeHeight(item) +
         getEffectiveTopSiblingMargin(item) +
         getEffectiveBottomSiblingMargin(item));
 }
@@ -88,7 +88,7 @@ export function getGapToPlaceholderOffset(to: InsertionPlaceCandidate): number {
   const effectiveTopGap = getEffectiveMarginBetweenSiblings(topSibling, to.placeholderEl);
   const effectiveBottomGap = getEffectiveMarginBetweenSiblings(to.placeholderEl, bottomSibling);
 
-  return getHeightWithPadding(to.placeholderEl) + effectiveTopGap + effectiveBottomGap - gap;
+  return getBorderSizeHeight(to.placeholderEl) + effectiveTopGap + effectiveBottomGap - gap;
 }
 
 export function getOffsets(dragState: DragState) {
