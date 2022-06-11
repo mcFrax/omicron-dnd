@@ -53,12 +53,16 @@ function createPlaceholder(toEl: ContainerEl) {
     // Use set transform after appendChild, so that it captures the base opacity
     // correctly.
     setTransform(placeholderEl, 'opacity', 0);
+    const computedStyle = getComputedStyle(placeholderEl);
     // Set background only if not set externally.
-    if (getComputedStyle(placeholderEl).backgroundColor !== 'rgba(0, 0, 0, 0)') {
+    if (computedStyle.backgroundImage === 'none' &&
+            computedStyle.backgroundColor === 'rgba(0, 0, 0, 0)') {
+        // Note: the above check can be defeated by using a different value for
+        // transparent color, e.g. rgba(1, 0, 0, 0);
         placeholderEl.style.background = 'lightgray';
     }
     // Set the height only if not set externally.
-    let autoHeight = getComputedStyle(placeholderEl).height;
+    let autoHeight = computedStyle.height;
     if (!autoHeight || autoHeight === '0px') {
         placeholderEl.style.height = Math.min(dragState.initialPickupRect.height - 16, 200) + 'px';
     }
