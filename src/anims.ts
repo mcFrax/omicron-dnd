@@ -200,46 +200,47 @@ function getInitialValue(elem: HTMLElement, prop: TransformOrProperty) {
     return getComputedStyleOr0(elem, prop);
 }
 
-type StartValueOrFn = 'current'|'base'|number|((previous: number, base: number) => number);
-type TargetValueOrFn = 'current'|'base'|number|((startValue: number, previous: number, base: number) => number);
+type SimpleValue = 'current'|'base'|number;
+type ComputedValueFn = (current: number, base: number) => number;
+type ValueOrFn = SimpleValue|ComputedValueFn;
+
+function resolveValueOrFn(valueOrFn: ValueOrFn, current: number, base: number): number {
+    return (valueOrFn ===  'current') ? current :
+        (valueOrFn ===  'base') ? base :
+            (typeof valueOrFn === 'function') ?
+                valueOrFn(current, base) : valueOrFn;
+}
 
 export function setTransform(
     elem: HTMLElement,
     prop: TransformOrProperty,
-    startValueOrFn: StartValueOrFn,
+    startValueOrFn: ValueOrFn,
     targetValueOrFn?: undefined,
     durationMs?: undefined,
 ): void;
 export function setTransform(
     elem: HTMLElement,
     prop: TransformOrProperty,
-    startValueOrFn: StartValueOrFn,
-    targetValueOrFn?: TargetValueOrFn|undefined,
+    startValueOrFn: ValueOrFn,
+    targetValueOrFn?: ValueOrFn|undefined,
     durationMs?: number,
 ): void;
 
 export function setTransform(
     elem: HTMLElement,
     prop: TransformOrProperty,
-    startValueOrFn: StartValueOrFn,
-    targetValueOrFn: TargetValueOrFn|undefined,
+    startValueOrFn: ValueOrFn,
+    targetValueOrFn: ValueOrFn|undefined,
     durationMs: number = animMs,
 ) {
     const preExistingElemAnims = elemsWithTransforms.get(elem);
     const preExisiting = getAnim(elem, prop);
     const clearValue = preExisiting?.clearValue ?? getClearValue(elem, prop);
     const previousValue = preExisiting?.currentValue ?? getInitialValue(elem, prop);
-    const startValue =
-        (startValueOrFn ===  'current') ? previousValue :
-            (startValueOrFn ===  'base') ? clearValue :
-                (typeof startValueOrFn === 'function') ?
-                    startValueOrFn(previousValue, clearValue) : startValueOrFn;
-
-    const targetValue = targetValueOrFn === undefined ? startValue :
-        (targetValueOrFn ===  'current') ? previousValue :
-            (targetValueOrFn ===  'base') ? clearValue :
-                (typeof targetValueOrFn === 'function') ?
-                    targetValueOrFn(startValue, previousValue, clearValue) : targetValueOrFn;
+    const startValue = resolveValueOrFn(startValueOrFn, previousValue, clearValue);
+    const targetValue =
+        targetValueOrFn === undefined ? startValue :
+            resolveValueOrFn(targetValueOrFn, previousValue, clearValue);
 
     if (targetValue === startValue) {
         durationMs = 0;
