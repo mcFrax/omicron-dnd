@@ -6,7 +6,12 @@ import { getOffsets } from "./offsets";
 import { dragState } from "./state";
 
 
-export function animateMoveInsideContainer(containerEl: ContainerEl, previousEventualIndex: number, newEventualIndex: number) {
+export function animateMoveInsideContainer(
+    containerEl: ContainerEl,
+    previousEventualIndex: number,
+    newEventualIndex: number,
+    gapToPlaceholderOffsetUpdated: boolean = true,
+) {
     // There are 4 groups of elements, adjusted by different offsets:
     //
     // 1. no offset
@@ -40,7 +45,7 @@ export function animateMoveInsideContainer(containerEl: ContainerEl, previousEve
     const maxItemIndex = getItemsInContainerEndIndex(containerEl) - 1;
     const affectedStart =
         Math.min(maxItemIndex, Math.min(newEventualIndex, previousEventualIndex));
-    const affectedEnd =
+    const affectedEnd = gapToPlaceholderOffsetUpdated ? maxItemIndex :
         Math.min(maxItemIndex, Math.max(newEventualIndex, previousEventualIndex));
 
     if (maxItemIndex === -1) {

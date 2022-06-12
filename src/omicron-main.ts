@@ -455,10 +455,16 @@ function updateOnMove(evtPoint: EvPlace) {
         to.eventualIndex = updatedEventualIndex;
         to.insertionIndex = updatedInsertionIndex;
 
+        const previousGapToPlaceholderOffset = to.gapToPlaceholderOffset;
         updatePlaceholderAndNoMoveZone(to);
         updateBottomPaddingCorrection();
 
-        animateMoveInsideContainer(to.containerEl, previousEventualIndex, updatedEventualIndex);
+        animateMoveInsideContainer(
+            to.containerEl,
+            previousEventualIndex,
+            updatedEventualIndex,
+            to.gapToPlaceholderOffset !== previousGapToPlaceholderOffset,
+        );
     }
 }
 
