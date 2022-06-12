@@ -528,7 +528,9 @@ function updatePlaceholderAndNoMoveZone(to: InsertionPlaceCandidate): void {
     let newPlaceholderTop = findPlaceholderTop(to);
     to.gapToPlaceholderOffset = getGapToPlaceholderOffset(to);
 
-    setTransform(to.placeholderEl, 'translateY', newPlaceholderTop);
+    // The margin is applied with absolute position anyway, so we need to
+    // subtract it when computing the transform.
+    setTransform(to.placeholderEl, 'translateY', newPlaceholderTop - getComputedStyleOr0(to.placeholderEl, 'marginTop'));
     setTransform(to.placeholderEl, 'scaleY', 0, 'base');
     setTransform(to.placeholderEl, 'opacity', 0, 'base');
 }
@@ -549,12 +551,10 @@ function findPlaceholderTop({
 
     if (!ref) {
         // Adding as the first element.
-        return getComputedStyleOr0(toEl, 'paddingTop');
+        return getComputedStyleOr0(toEl, 'paddingTop') + getComputedStyleOr0(placeholderEl, 'marginTop');
     }
 
     // Position the placeholder _after_ the ref.
-    const refBottomMargin = getComputedStyleOr0(placeholderEl, 'marginTop');
-    const marginCorrection = -refBottomMargin;
     const margin = getEffectiveMarginBetweenSiblings(ref, placeholderEl);
 
     const offsetCorrection =
@@ -562,7 +562,7 @@ function findPlaceholderTop({
                     dragState.pickedElToGapOffset : 0;
 
     const ref2 = ref as HTMLElement;
-    return ref2.offsetTop + ref2.offsetHeight + marginCorrection + margin + offsetCorrection;
+    return ref2.offsetTop + ref2.offsetHeight + margin + offsetCorrection;
 }
 
 function stateDrag_window_TouchCancel(event: TypedActiveEvent<TouchEvent, Document>) {
