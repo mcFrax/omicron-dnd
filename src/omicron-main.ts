@@ -449,8 +449,20 @@ function updateOnMove(evtPoint: EvPlace) {
 
     updateActiveScrollers();
 
-    let updatedInsertionIndex = findUpdatedInsertionIndex(to.containerEl, evtPoint);
-    let updatedEventualIndex = eventualIndexFromInsertionIndex(to.containerEl, updatedInsertionIndex);
+    const pointedInsertionIndex = findInsertionIndexAtPoint(to.containerEl, evtPoint);
+
+    if (pointedInsertionIndex === to.insertionIndex) {
+        return; // Nothing changes.
+    }
+
+    // The pointer might be pointing at a forbidden index now, but perhaps
+    // there is an allowed index on the way from current insertion and
+    // the pointed one - in this case, we should move the insertion as
+    // far towards the pointer as allowed.
+    const updatedInsertionIndex =
+        dragState.forbiddenIndices.furthestAllowedInsertionIndex(to.containerEl, dragState.pickedEl, to.insertionIndex, pointedInsertionIndex);
+
+    const updatedEventualIndex = eventualIndexFromInsertionIndex(to.containerEl, updatedInsertionIndex);
 
     if (updatedEventualIndex !== to.eventualIndex && !dragState.forbiddenIndices.isForbiddenIndex(to.containerEl, dragState.pickedEl, updatedInsertionIndex)) {
         let previousEventualIndex = to.eventualIndex;
@@ -470,7 +482,7 @@ function updateOnMove(evtPoint: EvPlace) {
     }
 }
 
-function findUpdatedInsertionIndex(containerEl: ContainerEl, evtPoint: EvPlace): number {
+function findInsertionIndexAtPoint(containerEl: ContainerEl, evtPoint: EvPlace): number {
     if (dragState?.state !== StateEnum.PendingDrag) throw new BadStateError(StateEnum.PendingDrag);
 
     // TODO: There is some glitch in how mouseY works after autoscroll.
@@ -499,21 +511,14 @@ function findUpdatedInsertionIndex(containerEl: ContainerEl, evtPoint: EvPlace):
         if (!(ref instanceof HTMLElement)) {
             continue;
         }
-        let eventualIndexCandidate = insertionIndexCandidate;
-        if (isMove && containerEl === fromEl) {
-            if (insertionIndexCandidate === fromIndex) {
-                continue;
-            }
-            if (insertionIndexCandidate > fromIndex) {
-                offsetCorrection = dragState.pickedElToGapOffset;
-                eventualIndexCandidate -= 1;
-            }
+        if (isMove && ref === dragState.pickedEl) {
+            continue;
         }
 
         const gapToPlaceholderOffset = getGapToPlaceholderOffset({
             containerEl,
             insertionIndex: insertionIndexCandidate,
-            eventualIndex: eventualIndexCandidate,
+            eventualIndex: eventualIndexFromInsertionIndex(containerEl, insertionIndexCandidate),
             placeholderEl: getOrCreatePlaceholder(containerEl),
             gapToPlaceholderOffset: 0, // placeholder value
         });
@@ -887,7 +892,7 @@ function maybeEnterContainer(
     if (ignoreGuards ||
             (xLast >= rect.left + rect.width * cData.options.enterGuardLeft + cData.options.enterGuardLeftPx &&
             xLast <= rect.right - rect.width * cData.options.enterGuardRight - cData.options.enterGuardRightPx)) {
-        const insertionIndex = forceInsertionIndex ?? findUpdatedInsertionIndex(cData.el, evPlace);
+        const insertionIndex = forceInsertionIndex ?? findInsertionIndexAtPoint(cData.el, evPlace);
         const eventualIndex = eventualIndexFromInsertionIndex(cData.el, insertionIndex);
         if (!dragState.forbiddenIndices.isForbiddenIndex(cData.el, dragState.pickedEl, insertionIndex)) {
             enterContainer(cData.el, insertionIndex, eventualIndex, animatePlaceholderFromPickedItem);

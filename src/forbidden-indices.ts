@@ -6,6 +6,20 @@ export class ForbiddenIndices {
       return this.getForbiddenInsertionIndices(containerEl, pickedEl).has(insertionIndex);
   }
 
+  public furthestAllowedInsertionIndex(
+    containerEl: ContainerEl,
+    pickedEl: HTMLElement,
+    currentInsertionIndex: number,
+    pointedInsertionIndex: number,
+  ) {
+      const forbiddenSet = this.getForbiddenInsertionIndices(containerEl, pickedEl);
+      const stepBack = pointedInsertionIndex < currentInsertionIndex ? 1 : -1;
+      for (let idx = pointedInsertionIndex; idx !== currentInsertionIndex; idx += stepBack) {
+        if (!forbiddenSet.has(idx)) return idx;
+      }
+      return currentInsertionIndex;
+  }
+
   private getForbiddenInsertionIndices(containerEl: ContainerEl, pickedEl: HTMLElement) {
       let cachedValue = this.forbiddenInsertionIndicesCache.get(containerEl);
       if (cachedValue) {
