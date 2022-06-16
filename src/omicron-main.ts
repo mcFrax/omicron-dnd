@@ -325,6 +325,8 @@ function startDrag() {
         // Synthethic update, to determine the insertion point.
         updateOnMove(startEvPoint);
     }
+
+    startPlaceholderUpdates();
 }
 function statePreDrag_window_TouchStart(event: TypedActiveEvent<TouchEvent, Document>) {
     if (dragState && event.touches.length !== 1) {
@@ -528,6 +530,27 @@ function findUpdatedInsertionIndex(containerEl: ContainerEl, evtPoint: EvPlace):
     }
 
     return endIndex;
+}
+
+let placeholderUpdateAnimationFrameRequestId = 0;
+
+function startPlaceholderUpdates() {
+    if (placeholderUpdateAnimationFrameRequestId === 0) {
+        placeholderUpdateAnimationFrameRequestId =
+                requestAnimationFrame(placeholderUpdateAnimationFrame);
+    }
+}
+
+function placeholderUpdateAnimationFrame() {
+    if (dragState?.state === StateEnum.PendingDrag) {
+        placeholderUpdateAnimationFrameRequestId =
+                requestAnimationFrame(placeholderUpdateAnimationFrame);
+    } else {
+        placeholderUpdateAnimationFrameRequestId = 0;
+    }
+    if (dragState?.state === StateEnum.PendingDrag && dragState.to) {
+        updatePlaceholderAndNoMoveZone(dragState.to, false);
+    }
 }
 
 function updatePlaceholderAndNoMoveZone(
