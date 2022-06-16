@@ -456,7 +456,7 @@ function updateOnMove(evtPoint: EvPlace) {
         to.insertionIndex = updatedInsertionIndex;
 
         const previousGapToPlaceholderOffset = to.gapToPlaceholderOffset;
-        updatePlaceholderAndNoMoveZone(to);
+        updatePlaceholderAndNoMoveZone(to, true);
         updateBottomPaddingCorrection();
 
         animateMoveInsideContainer(
@@ -530,15 +530,20 @@ function findUpdatedInsertionIndex(containerEl: ContainerEl, evtPoint: EvPlace):
     return endIndex;
 }
 
-function updatePlaceholderAndNoMoveZone(to: InsertionPlaceCandidate): void {
+function updatePlaceholderAndNoMoveZone(
+    to: InsertionPlaceCandidate,
+    animateInNewPlace: boolean,
+): void {
     let newPlaceholderTop = findPlaceholderTop(to);
     to.gapToPlaceholderOffset = getGapToPlaceholderOffset(to);
 
     // The margin is applied with absolute position anyway, so we need to
     // subtract it when computing the transform.
     setTransform(to.placeholderEl, 'translateY', newPlaceholderTop - getComputedStyleOr0(to.placeholderEl, 'marginTop'));
-    setTransform(to.placeholderEl, 'scaleY', 0, 'base');
-    setTransform(to.placeholderEl, 'opacity', 0, 'base');
+    if (animateInNewPlace) {
+        setTransform(to.placeholderEl, 'scaleY', 0, 'base');
+        setTransform(to.placeholderEl, 'opacity', 0, 'base');
+    }
 }
 
 function findPlaceholderTop({
@@ -893,7 +898,7 @@ function enterContainer(
         gapToPlaceholderOffset: 0,  // Will be set below.
     }
 
-    updatePlaceholderAndNoMoveZone(dragState.to);
+    updatePlaceholderAndNoMoveZone(dragState.to, true);
     updateBottomPaddingCorrection();
     showPlaceholder(dragState.to.placeholderEl, animatePlaceholderFromPickedItem);
 
