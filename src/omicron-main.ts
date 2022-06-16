@@ -458,7 +458,7 @@ function updateOnMove(evtPoint: EvPlace) {
         to.insertionIndex = updatedInsertionIndex;
 
         const previousGapToPlaceholderOffset = to.gapToPlaceholderOffset;
-        updatePlaceholderAndNoMoveZone(to, true);
+        updatePlaceholder(to, true);
         updateBottomPaddingCorrection();
 
         animateMoveInsideContainer(
@@ -549,11 +549,11 @@ function placeholderUpdateAnimationFrame() {
         placeholderUpdateAnimationFrameRequestId = 0;
     }
     if (dragState?.state === StateEnum.PendingDrag && dragState.to) {
-        updatePlaceholderAndNoMoveZone(dragState.to, false);
+        updatePlaceholder(dragState.to, false);
     }
 }
 
-function updatePlaceholderAndNoMoveZone(
+function updatePlaceholder(
     to: InsertionPlaceCandidate,
     animateInNewPlace: boolean,
 ): void {
@@ -921,7 +921,7 @@ function enterContainer(
         gapToPlaceholderOffset: 0,  // Will be set below.
     }
 
-    updatePlaceholderAndNoMoveZone(dragState.to, true);
+    updatePlaceholder(dragState.to, true);
     updateBottomPaddingCorrection();
     showPlaceholder(dragState.to.placeholderEl, animatePlaceholderFromPickedItem);
 
