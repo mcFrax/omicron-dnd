@@ -509,8 +509,15 @@ function findInsertionIndexAtPoint(containerEl: ContainerEl, evtPoint: EvPlace):
         if (!(ref instanceof HTMLElement)) {
             continue;
         }
-        if (isMove && ref === dragState.pickedEl) {
-            continue;
+        let eventualIndexCandidate = insertionIndexCandidate;
+        if (isMove && containerEl === fromEl) {
+            if (insertionIndexCandidate === fromIndex) {
+                continue;
+            }
+            if (insertionIndexCandidate > fromIndex) {
+                offsetCorrection = dragState.pickedElToGapOffset;
+                eventualIndexCandidate -= 1;
+            }
         }
 
         const gapToPlaceholderOffset = getGapToPlaceholderOffset({
