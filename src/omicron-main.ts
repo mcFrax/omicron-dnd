@@ -451,10 +451,6 @@ function updateOnMove(evtPoint: EvPlace) {
 
     const pointedInsertionIndex = findInsertionIndexAtPoint(to.containerEl, evtPoint);
 
-    if (pointedInsertionIndex === to.insertionIndex) {
-        return; // Nothing changes.
-    }
-
     // The pointer might be pointing at a forbidden index now, but perhaps
     // there is an allowed index on the way from current insertion and
     // the pointed one - in this case, we should move the insertion as
@@ -464,22 +460,24 @@ function updateOnMove(evtPoint: EvPlace) {
 
     const updatedEventualIndex = eventualIndexFromInsertionIndex(to.containerEl, updatedInsertionIndex);
 
-    if (updatedEventualIndex !== to.eventualIndex && !dragState.forbiddenIndices.isForbiddenIndex(to.containerEl, dragState.pickedEl, updatedInsertionIndex)) {
-        let previousEventualIndex = to.eventualIndex;
-        to.eventualIndex = updatedEventualIndex;
-        to.insertionIndex = updatedInsertionIndex;
-
-        const previousGapToPlaceholderOffset = to.gapToPlaceholderOffset;
-        updatePlaceholder(to, true);
-        updateBottomPaddingCorrection();
-
-        animateMoveInsideContainer(
-            to.containerEl,
-            previousEventualIndex,
-            updatedEventualIndex,
-            to.gapToPlaceholderOffset !== previousGapToPlaceholderOffset,
-        );
+    if (updatedEventualIndex === to.eventualIndex) {
+        return; // Nothing changes.
     }
+
+    let previousEventualIndex = to.eventualIndex;
+    to.eventualIndex = updatedEventualIndex;
+    to.insertionIndex = updatedInsertionIndex;
+
+    const previousGapToPlaceholderOffset = to.gapToPlaceholderOffset;
+    updatePlaceholder(to, true);
+    updateBottomPaddingCorrection();
+
+    animateMoveInsideContainer(
+        to.containerEl,
+        previousEventualIndex,
+        updatedEventualIndex,
+        to.gapToPlaceholderOffset !== previousGapToPlaceholderOffset,
+    );
 }
 
 function findInsertionIndexAtPoint(containerEl: ContainerEl, evtPoint: EvPlace): number {
