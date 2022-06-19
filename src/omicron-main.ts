@@ -234,6 +234,7 @@ function anyState_container_PointerDown(event: TypedActiveEvent<PointerEvent, Co
         minimalMoveMouse: containerOptions.minimalMoveMouse,
         forbiddenIndices: new ForbiddenIndices(),
         preDragTimeoutId,
+        recentSnapScrollActivations: new Map(),
     });
 }
 function startDrag() {

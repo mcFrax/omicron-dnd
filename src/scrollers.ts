@@ -1,5 +1,7 @@
 import { dragState } from './state';
 
+const snapScrollCooldownMs = 500;
+
 // Id returned by requestAnimationFrame. Always reset to 0 when no frame is
 // requested.
 let animFrameRequestId = 0; // 0 is never used as actual id.
@@ -14,7 +16,6 @@ interface ScrollerRecord {
     horizontal: boolean,
     vertical: boolean,
     snap: boolean,
-    snapCooldown: boolean,
 }
 let scrollers: ScrollerRecord[] = [];
 
@@ -31,6 +32,7 @@ interface ActiveScroller {
     horizontal: number,
     vertical: number,
     speedInput: number,
+    snap: Boolean,
 }
 let activeScrollers: ActiveScroller[] = [];
 
@@ -67,7 +69,6 @@ function collectScrollers(elem: HTMLElement|null) : ScrollerRecord[] {
             horizontal: horizontalScroll,
             vertical: verticalScroll,
             snap: Boolean(elem.dataset.omicronScrollSnap),
-            snapCooldown: false,
         });
     }
     return result;
@@ -75,27 +76,14 @@ function collectScrollers(elem: HTMLElement|null) : ScrollerRecord[] {
 
 // This is a helper for updateActiveScrollers, only to be called from there.
 function activateScroller(scroller: ScrollerRecord, horizontal: number, vertical: number, speedInput: number) {
-    if (scroller.snap) {
-        if (!scroller.snapCooldown) {
-            if (horizontal) {
-                scroller.el.scrollLeft += horizontal * scroller.el.clientWidth;
-            }
-            if (vertical) {
-                scroller.el.scrollTop += vertical * scroller.el.clientHeight;
-            }
-            scroller.snapCooldown = true; // Prevent immediate re-activation.
-        }
-        // TODO: Either force recomputing the rects for other scrollers after
-        // the scroll, or maybe just give up caching the rects.
-    } else {
-        activeScrollers.push({
-            scrollerIndex: scrollers.indexOf(scroller),
-            scrollerEl: scroller.el,
-            horizontal,
-            vertical,
-            speedInput,
-        });
-    }
+    activeScrollers.push({
+        scrollerIndex: scrollers.indexOf(scroller),
+        scrollerEl: scroller.el,
+        horizontal,
+        vertical,
+        speedInput,
+        snap: scroller.snap,
+    });
 }
 
 const minScrollSpeed = 0.3; // In pixels per millisecond.
@@ -112,6 +100,7 @@ function animationFrame(timestamp: DOMHighResTimeStamp) {
         // Animate. If lastScrollAnimationTimestamp is not set, the animation
         // will start on the next frame.
         for (let s of activeScrollers) {
+            if (s.snap) continue; // Handle snap scrollers separately.
             // Notice the difference between entries in activeScrollers and
             // scrollers arrays, they are different.
             const scrollSpeed = minScrollSpeed + s.speedInput * maxScrollSpeedIncrease;
@@ -134,6 +123,25 @@ function animationFrame(timestamp: DOMHighResTimeStamp) {
                 }
             }
         }
+    }
+    // Handling for snap scrollers.
+    for (let s of activeScrollers) {
+        if (!s.snap) continue;
+
+        const lastActivation = dragState?.recentSnapScrollActivations.get(s.scrollerEl) ?? 0;
+        const now = Date.now();
+        if (now > lastActivation + snapScrollCooldownMs) {
+            if (s.horizontal) {
+                s.scrollerEl.scrollLeft += s.horizontal * s.scrollerEl.clientWidth;
+            }
+            if (s.vertical) {
+                s.scrollerEl.scrollTop += s.vertical * s.scrollerEl.clientHeight;
+            }
+            // Prevent immediate re-activation.
+            dragState?.recentSnapScrollActivations.set(s.scrollerEl, now);
+        }
+        // TODO: Either force recomputing the rects for other scrollers after
+        // the scroll, or maybe just give up caching the rects.
     }
     lastScrollAnimationTimestamp = timestamp;
     animFrameRequestId = requestAnimationFrame(animationFrame);
@@ -178,7 +186,8 @@ export function updateActiveScrollers() {
                 activateScroller(scroller, 1, 0,
                     (xLast - scroller.rect.right + scrollActivationMargin) / scrollActivationMargin);
             } else {
-                scroller.snapCooldown = false;
+                // Immediately allow next snap scroll.
+                dragState.recentSnapScrollActivations.delete(scroller.el);
             }
         }
         if (scroller.vertical) {
@@ -190,6 +199,9 @@ export function updateActiveScrollers() {
                 // Scrolling down.
                 activateScroller(scroller, 0, 1,
                     (yLast - scroller.rect.bottom + scrollActivationMargin) / scrollActivationMargin);
+            } else {
+                // Immediately allow next snap scroll.
+                dragState.recentSnapScrollActivations.delete(scroller.el);
             }
         }
     }

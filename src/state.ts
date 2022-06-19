@@ -48,8 +48,7 @@ type BaseDragState = {
   from: ItemOriginalPlace
   // DOMRect of pickedEl at the time of pointerdown event.
   initialPickupRect: DOMRect
-  // Precomputed offsets. As the element is hidden, it's computed style may
-  // change, even though it doesn't affect the 
+  // Precomputed offsets.
   pickedElToGapOffset: number
   pickedElToNothingOffset: number
   // Pointer position from original pointerdown event.
@@ -70,6 +69,13 @@ type BaseDragState = {
   minimalMoveMouse: number
   // Forbidden indices cache.
   forbiddenIndices: ForbiddenIndices
+  // Snap scroll cooldown. Holds snap scrollers that were recently activated,
+  // to avoid immediate re-activation, as well as allow reactivation after
+  // cooldown period.
+  // This would be better as some opaque class implemented inside scrollers.ts,
+  // but for now that would cause a circular dependency that I don't have
+  // satisfying solution for.
+  recentSnapScrollActivations: Map<HTMLElement, number>
 };
 
 export type PreDragState = BaseDragState & {
