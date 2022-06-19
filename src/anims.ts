@@ -8,8 +8,7 @@ let animFrameRequestId = 0; // 0 is never used as actual id.
 
 type TransformName =
     'translateX' | 'translateY' |
-    'scale' | 'scaleX' | 'scaleY' |
-    'rotate';
+    'scale' | 'scaleX' | 'scaleY';
 type CssUnit = '' | 'px' | 'deg';
 const unitForTransform: Record<TransformName, CssUnit> = {
     translateX: 'px',
@@ -17,15 +16,13 @@ const unitForTransform: Record<TransformName, CssUnit> = {
     scale: '',
     scaleX: '',
     scaleY: '',
-    rotate: 'deg',
 };
-const defaultForTransform: Record<TransformName, number> = {
+const defaultForTransform: Readonly<Record<TransformName, number>> = {
     translateX: 0,
     translateY: 0,
     scale: 1,
     scaleX: 1,
     scaleY: 1,
-    rotate: 0,
 };
 
 const unitForProp: typeof unitForTransform & Record<KnownNumberProperty, CssUnit> = {
@@ -88,6 +85,8 @@ type ElementAnims = {
     pendingCount: number,
     // We need to apply all non-zero transforms together anyway, so let's just
     // keep an array.
+    updatedTransforms: number,
+    transformValues: Record<TransformName, number>,
     allTransforms: SingleParamAnim[],
     resolveOnFinish: (() => void) | null,
 };
@@ -116,11 +115,15 @@ function animationFrame(timestamp: DOMHighResTimeStamp) {
 
 function elemAnimationFrame(timestamp: DOMHighResTimeStamp, elem: HTMLElement, anims: ElementAnims) {
     if (anims.pendingCount === 0) return; // Sanity check.
-    const transforms: string[] = [];
+    anims.updatedTransforms = 0;
     for (let i = anims.allTransforms.length - 1; i >= 0; --i) {
-        paramAnimationFrame(timestamp, anims, anims.allTransforms[i], i, transforms);
+        paramAnimationFrame(timestamp, anims, anims.allTransforms[i], i);
     }
-    elem.style.transform = transforms.join(' ');
+    if (anims.updatedTransforms !== 0) {
+        const v = anims.transformValues;
+        elem.style.transform =
+            `translate(${v.translateX}px, ${v.translateY}px) scale(${v.scale * v.scaleX}, ${v.scale * v.scaleY})`;
+    }
     if (anims.allTransforms.length === 0) {
         // Everything zeroed and it's no longer necessary to keep the record.
         elemsWithPending.delete(elem);
@@ -136,50 +139,32 @@ function paramAnimationFrame(
     anims: ElementAnims,
     anim: SingleParamAnim,
     animIdx: number,
-    transforms: string[],
 ) {
-    if (anim.pending) {
-        updateCurrentValueOnFrame(timestamp, anim, anims, animIdx);
-    }
+    if (!anim.pending) return;
 
-    applyCurrentValue(anim, transforms);
-}
-
-function updateCurrentValueOnFrame(
-    timestamp: DOMHighResTimeStamp,
-    anim: SingleParamAnim,
-    anims: ElementAnims,
-    animIdx: number,
-) {
     if (!anim.startTime) {
         anim.startTime = timestamp;
         anim.endTime = timestamp + anim.durationMs;
-        return;
-    }
-    const advancementRate =
-        timestamp >= anim.endTime ? 1 : (timestamp - anim.startTime) / anim.durationMs;
-    anim.currentValue =
-        advancementRate * anim.targetValue + (1 - advancementRate) * anim.startValue;
+    } else {
+        const advancementRate =
+            timestamp >= anim.endTime ? 1 : (timestamp - anim.startTime) / anim.durationMs;
+        anim.currentValue =
+            advancementRate * anim.targetValue + (1 - advancementRate) * anim.startValue;
 
-    if (advancementRate >= 1) {
-        anims.pendingCount -= 1;
-        anim.pending = false;
-        if (anim.currentValue === anim.clearValue) {
-            // Remove the transform. We need to keep order due to
-            // translate/scale ordering issue.
-            anims.allTransforms.splice(animIdx, 1);
+        if (advancementRate >= 1) {
+            anims.pendingCount -= 1;
+            anim.pending = false;
+            if (anim.currentValue === anim.clearValue) {
+                // Remove the transform. We need to keep order due to
+                // translate/scale ordering issue.
+                anims.allTransforms.splice(animIdx, 1);
+            }
         }
     }
-}
 
-function applyCurrentValue(
-    anim: SingleParamAnim,
-    transforms: string[],
-) {
     if (isTransform(anim.prop)) {
-        if (anim.currentValue !== anim.clearValue) {
-            transforms.push(`${anim.prop}(${anim.currentValue}${anim.unit})`);
-        }
+        anims.transformValues[anim.prop] = anim.currentValue;
+        anims.updatedTransforms += 1;
     } else if (anim.pending || anim.currentValue !== anim.clearValue) {
         anim.elem.style[anim.prop] = `${anim.currentValue}${anim.unit}`;
     } else {
@@ -270,17 +255,12 @@ export function setTransform(
             },
         );
     if (preExistingElemAnims && !preExisiting) {
-        if (prop === 'translateX' || prop === 'translateY') {
-            // Order matters between transitions. We need to keep the
-            // translations after scaling and rotations to keep the
-            // semantics consistent.
-            preExistingElemAnims.allTransforms.push(anim);
-        } else {
-            preExistingElemAnims.allTransforms.unshift(anim);
-        }
+        preExistingElemAnims.allTransforms.push(anim);
     }
     const elemAnims = preExistingElemAnims ?? {
         pendingCount: 0,
+        updatedTransforms: 0,
+        transformValues: Object.create(defaultForTransform),
         allTransforms: [anim],
         resolveOnFinish: null,
     };
